@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import type { CSSProperties, KeyboardEvent } from "react";
 import {
   Archive,
   ArchiveRestore,
+  ArrowRight,
   ChevronDown,
   ChevronUp,
   Bold,
@@ -22,6 +23,7 @@ import {
   Sparkles,
   Tag,
   Trash2,
+  TriangleAlert,
   Type,
   Underline,
   Upload,
@@ -31,7 +33,8 @@ import {
 import AuthScreen from "./AuthScreen";
 import ThemeToggle from "./ThemeToggle";
 import FigureChat from "./FigureChat";
-import LatexEditor, { type LatexEditorHandle } from "./LatexEditor";
+import Logo from "./Logo";
+import LatexEditor, { type FormatCommand, type LatexEditorHandle } from "./LatexEditor";
 import { buildOutline, type OutlineItem } from "./latexOutline";
 import { ImportError, MAX_FILE_COUNT, MAX_PROJECT_BYTES, importUploads } from "./projectImport";
 import { ApiError, apiFetch, apiJson, errorMessage, type User } from "./api";
@@ -315,6 +318,31 @@ const createProjectZip = (projects: ProjectSummary[]) => {
   return createZipBlob(entries);
 };
 
+// Platform check without a server/client mismatch: the server renders "Ctrl", the browser corrects it.
+const noopSubscribe = () => () => {};
+const isMacPlatform = () => /Mac|iPhone|iPad/.test(navigator.platform);
+
+// The first error in a TeX log, so the preview can point at the line: "./Main.tex:12: message" (the backend runs
+// pdflatex with -file-line-error) or "! message" followed by "l.12 ...". TeX hard-wraps its log at 79 characters.
+const firstTexError = (log: string) => {
+  const lines = log.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const fileLine = /^(?:\.\/)?(.+?\.tex):(\d+): (.*)$/.exec(lines[i]);
+    if (fileLine) {
+      let message = fileLine[3];
+      for (let j = i; lines[j].length === 79 && j + 1 < lines.length; j++) message += lines[j + 1];
+      // The backend compiles in a temporary ".../project/" folder; keep only the path inside the project.
+      const file = fileLine[1].replace(/^.*\/project\//, "");
+      return { file, line: Number(fileLine[2]), message: message.trim() };
+    }
+    if (lines[i].startsWith("! ")) {
+      const at = lines.slice(i + 1, i + 12).find((line) => /^l\.\d+/.test(line));
+      return { file: null, line: at ? Number(/^l\.(\d+)/.exec(at)?.[1]) : null, message: lines[i].slice(2).trim() };
+    }
+  }
+  return null;
+};
+
 const waitForTransition = (duration = 450) =>
   new Promise<void>((resolve) => {
     window.setTimeout(resolve, duration);
@@ -339,6 +367,11 @@ export default function Home() {
   const [collapsedOutlineIds, setCollapsedOutlineIds] = useState<Set<string>>(() => new Set());
   const [isRefreshingPreview, setIsRefreshingPreview] = useState(false);
   const [compileOutput, setCompileOutput] = useState<CompileOutput | null>(null);
+  // The last PDF stays on screen while the source changes; this marks it as behind the editor.
+  const [isPreviewStale, setIsPreviewStale] = useState(false);
+  const [compileSeconds, setCompileSeconds] = useState<number | null>(null);
+  const projectSearchRef = useRef<HTMLInputElement>(null);
+  const modKey = useSyncExternalStore(noopSubscribe, () => (isMacPlatform() ? "⌘" : "Ctrl"), () => "Ctrl");
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchStatus, setSearchStatus] = useState("");
@@ -645,9 +678,10 @@ export default function Home() {
         : "All changes saved";
 
   useEffect(() => {
+    // Long enough for the logo to start its story, short enough not to keep anyone waiting.
     const timer = window.setTimeout(() => {
       setIsBooting(false);
-    }, 4000);
+    }, 1100);
 
     return () => window.clearTimeout(timer);
   }, []);
@@ -677,6 +711,37 @@ export default function Home() {
       document.removeEventListener("mousedown", closeFileMenu);
     };
   }, [openFileMenuId]);
+
+  useEffect(() => {
+    if (!isProfileMenuOpen) {
+      return;
+    }
+
+    const closeProfileMenu = (event: MouseEvent) => {
+      if (event.target instanceof Element && event.target.closest(".profile-menu-wrap")) {
+        return;
+      }
+
+      setIsProfileMenuOpen(false);
+    };
+
+    document.addEventListener("mousedown", closeProfileMenu);
+
+    return () => {
+      document.removeEventListener("mousedown", closeProfileMenu);
+    };
+  }, [isProfileMenuOpen]);
+
+  // Information toasts leave on their own; errors stay until dismissed.
+  useEffect(() => {
+    if (uploadNotice?.tone !== "info") {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setUploadNotice(null), 6000);
+
+    return () => window.clearTimeout(timer);
+  }, [uploadNotice]);
 
   const updateActiveProjectFiles = (
     updater: (currentFiles: ProjectFile[]) => ProjectFile[],
@@ -709,7 +774,7 @@ export default function Home() {
 
   const updateActiveContent = (content: string) => {
     updateActiveFile({ content });
-    setCompileOutput(null);
+    setIsPreviewStale(true);
   };
 
   const runPageTransition = async (
@@ -762,7 +827,6 @@ export default function Home() {
 
     updateActiveProjectFiles((currentFiles) => [...currentFiles, nextFile]);
     setActiveFileId(nextFile.id);
-    setCompileOutput(null);
 
     window.requestAnimationFrame(() => editorRef.current?.focus());
   };
@@ -967,7 +1031,6 @@ Start writing your TikZ code here.
 
   const handleSelectFile = (fileId: string) => {
     setActiveFileId(fileId);
-    setCompileOutput(null);
     setOpenFileMenuId(null);
 
     window.requestAnimationFrame(() => {
@@ -1025,7 +1088,7 @@ Start writing your TikZ code here.
     setOpenFileMenuId(null);
     setRenamingFileId(null);
     setDraftFileName("");
-    setCompileOutput(null);
+    setIsPreviewStale(true);
 
     if (activeFileId === fileId) {
       setActiveFileId(remainingFiles[0]?.id ?? "");
@@ -1268,7 +1331,7 @@ Start writing your TikZ code here.
     setSearchStatus(`${nextIndex + 1}/${searchMatches.length}`);
   };
 
-  const applyTextCommand = (command: "textbf" | "textit" | "underline") => {
+  const applyTextCommand = (command: FormatCommand) => {
     const editor = editorRef.current;
 
     if (!editor) {
@@ -1298,15 +1361,22 @@ Start writing your TikZ code here.
     });
   };
 
+  // The document to compile: the open .tex file if it is a whole document, otherwise the project's file with
+  // \documentclass, so compiling while a chapter or the .bib is open still builds the whole project.
+  const mainFile =
+    (isTexFile && activeFile?.content.includes("\\documentclass") ? activeFile : undefined) ??
+    projectFiles.find((file) => /\.tex$/i.test(file.name) && file.content.includes("\\documentclass")) ??
+    (isTexFile ? activeFile : undefined);
+
   const handleRefreshPreview = async () => {
     if (isRefreshingPreview) {
       return;
     }
 
-    if (!isTexFile) {
+    if (!mainFile) {
       setCompileOutput({
         ok: false,
-        message: "Select a .tex file before compiling.",
+        message: "Add a .tex file with \\documentclass to compile.",
         log: "",
       });
       return;
@@ -1314,19 +1384,17 @@ Start writing your TikZ code here.
 
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 60_000);
+    const startedAt = performance.now();
 
+    // The previous PDF stays visible under a "compiling" veil until the new one arrives.
     setIsRefreshingPreview(true);
-    setCompileOutput(null);
 
     try {
       const response = await apiFetch("/api/v1/compile", {
         method: "POST",
         body: JSON.stringify({
-          mainFileName: fileName,
-          files: projectFiles.map((file) => ({
-            name: file.name,
-            content: file.id === activeFileId ? sourceCode : file.content,
-          })),
+          mainFileName: mainFile.name,
+          files: projectFiles.map((file) => ({ name: file.name, content: file.content })),
         }),
         signal: controller.signal,
       });
@@ -1351,7 +1419,7 @@ Start writing your TikZ code here.
       }
 
       const pdfBlob = await response.blob();
-      const fallbackFileName = `${sanitizeFileName(fileName.replace(/\.tex$/i, ""))}.pdf`;
+      const fallbackFileName = `${sanitizeFileName(mainFile.name.replace(/\.tex$/i, ""))}.pdf`;
 
       setCompileOutput({
         ok: true,
@@ -1361,6 +1429,8 @@ Start writing your TikZ code here.
         ),
         pdfObjectUrl: URL.createObjectURL(pdfBlob),
       });
+      setIsPreviewStale(false);
+      setCompileSeconds((performance.now() - startedAt) / 1000);
     } catch (error) {
       const timedOut = error instanceof DOMException && error.name === "AbortError";
 
@@ -1389,13 +1459,87 @@ Start writing your TikZ code here.
     link.click();
   };
 
+  // Jump the editor to a line (from a compile error), opening that file first if needed.
+  const goToSourceLine = (name: string | null, line: number) => {
+    const target = (name && projectFiles.find((file) => file.name === name.replace(/^\.\//, ""))) || mainFile;
+
+    if (!target) {
+      return;
+    }
+
+    const lines = target.content.split("\n");
+    const start = lines.slice(0, line - 1).reduce((offset, text) => offset + text.length + 1, 0);
+    const end = start + (lines[line - 1]?.length ?? 0);
+
+    if (target.id !== activeFileId) {
+      setActiveFileId(target.id);
+    }
+
+    window.requestAnimationFrame(() => selectEditorRange(start, end));
+  };
+
+  // Shortcuts: Mod+Enter / Mod+S compile (the editor handles them itself when focused), "/" focuses project
+  // search, Escape closes open menus and dialogs. Re-subscribed each render so it always sees current state.
+  useEffect(() => {
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.defaultPrevented) {
+        return;
+      }
+
+      const mod = event.metaKey || event.ctrlKey;
+
+      const isCompileKey = mod && (event.key === "Enter" || event.key.toLowerCase() === "s");
+
+      if (currentView === "editor" && user && !isFigureModalOpen && isCompileKey) {
+        event.preventDefault();
+        void handleRefreshPreview();
+        return;
+      }
+
+      if (event.key === "Escape") {
+        setIsProfileMenuOpen(false);
+        setOpenFileMenuId(null);
+        setIsNewProjectModalOpen(false);
+        setIsNewTagModalOpen(false);
+        return;
+      }
+
+      const isTyping =
+        event.target instanceof HTMLElement && event.target.closest("input, textarea, select, [contenteditable='true']");
+
+      if (currentView === "dashboard" && event.key === "/" && !mod && !isTyping) {
+        event.preventDefault();
+        projectSearchRef.current?.focus();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => window.removeEventListener("keydown", onKeyDown);
+  });
+
+  const beforeCursor = sourceCode.slice(0, cursorPosition);
+  const cursorLine = beforeCursor.split("\n").length;
+  const cursorColumn = beforeCursor.length - beforeCursor.lastIndexOf("\n");
+  const texError = compileOutput && !compileOutput.ok ? firstTexError(compileOutput.log) : null;
+  // Only offer the jump when the error is in one of the project's own files (not a system .tex file).
+  const canJumpToError =
+    Boolean(texError?.line) && (!texError?.file || projectFiles.some((file) => file.name === texError.file));
+  const compileChip = isRefreshingPreview
+    ? { tone: "busy", label: "Compiling…" }
+    : compileOutput?.ok
+      ? isPreviewStale
+        ? { tone: "stale", label: "Out of date" }
+        : { tone: "ok", label: compileSeconds ? `Compiled in ${compileSeconds.toFixed(1)}s` : "Compiled" }
+      : compileOutput
+        ? { tone: "error", label: "Compile failed" }
+        : null;
+
   if (isBooting || !isSessionChecked) {
     return (
       <main className="loading-screen" aria-label="Loading TikZ Studio">
-        <div className="loading-orbit" aria-hidden="true">
-          <span />
-          <span />
-          <span />
+        <div className="loading-logo" aria-hidden="true">
+          <Logo size={96} loop />
         </div>
         <div className="loading-copy">
           <h1>TikZ Studio</h1>
@@ -1415,10 +1559,8 @@ Start writing your TikZ code here.
         {uploadNoticeBanner}
         {transitionLabel && (
           <div className="transition-overlay" aria-live="polite">
-            <div className="loading-orbit compact" aria-hidden="true">
-              <span />
-              <span />
-              <span />
+            <div className="loading-logo compact" aria-hidden="true">
+              <Logo size={68} loop />
             </div>
             <div className="loading-copy transition-copy">
               <h1>TikZ Studio</h1>
@@ -1531,14 +1673,18 @@ Start writing your TikZ code here.
             </button>
           </section>
 
-          <div className="dashboard-brand">TikZ Studio</div>
+          <div className="dashboard-brand">
+            <Logo size={30} loop />
+            <span>TikZ Studio</span>
+          </div>
         </aside>
 
         <section className="projects-page" aria-label={dashboardTitle}>
           <header className="projects-header">
             <h1>{dashboardTitle}</h1>
             <div className="plan-pill">
-              <span>
+              <span className="save-status">
+                <span className={`save-dot ${saveState.status}`} aria-hidden="true" />
                 <strong>{user.email}</strong> · {saveLabel}
               </span>
               <ThemeToggle />
@@ -1552,10 +1698,12 @@ Start writing your TikZ code here.
             <Search size={19} />
             <span className="sr-only">Search projects</span>
             <input
+              ref={projectSearchRef}
               placeholder={`Search in ${dashboardTitle.toLowerCase()}...`}
               value={projectSearchQuery}
               onChange={(event) => setProjectSearchQuery(event.target.value)}
             />
+            <kbd className="search-kbd" title="Press / to search">/</kbd>
           </label>
 
           {selectedProjectIds.length > 0 && (
@@ -1602,8 +1750,13 @@ Start writing your TikZ code here.
               <span role="columnheader">Actions</span>
             </div>
 
-            {filteredProjects.map((project) => (
-              <div className="projects-table-row" role="row" key={project.id}>
+            {filteredProjects.map((project, index) => (
+              <div
+                className="projects-table-row project-row"
+                role="row"
+                key={project.id}
+                style={{ "--i": Math.min(index, 12) } as CSSProperties}
+              >
                 <div className="project-title-cell">
                   <input
                     type="checkbox"
@@ -1688,14 +1841,28 @@ Start writing your TikZ code here.
 
             {filteredProjects.length === 0 && (
               <div className="projects-empty">
-                No projects match this view. Try another filter or create a new project.
+                <Logo size={56} />
+                <h2>{projectSearchQuery.trim() ? "No projects match your search" : "Nothing here yet"}</h2>
+                <p>
+                  {projectSearchQuery.trim()
+                    ? "Try a different word, or clear the search."
+                    : "Projects you create or upload will show up here."}
+                </p>
+                <button className="new-project-button" type="button" onClick={openNewProjectModal}>
+                  <Plus size={17} />
+                  New project
+                </button>
               </div>
             )}
           </div>
         </section>
 
         {isNewProjectModalOpen && (
-          <div className="modal-backdrop" role="presentation">
+          <div
+            className="modal-backdrop"
+            role="presentation"
+            onMouseDown={(event) => event.target === event.currentTarget && setIsNewProjectModalOpen(false)}
+          >
             <form
               className="new-project-modal"
               aria-label="Create new project"
@@ -1738,14 +1905,18 @@ Start writing your TikZ code here.
                 >
                   Cancel
                 </button>
-                <button type="submit">Generate</button>
+                <button type="submit">Create project</button>
               </div>
             </form>
           </div>
         )}
 
         {isNewTagModalOpen && (
-          <div className="modal-backdrop" role="presentation">
+          <div
+            className="modal-backdrop"
+            role="presentation"
+            onMouseDown={(event) => event.target === event.currentTarget && setIsNewTagModalOpen(false)}
+          >
             <form
               className="new-project-modal"
               aria-label="Create new tag"
@@ -1808,10 +1979,8 @@ Start writing your TikZ code here.
       {uploadNoticeBanner}
       {transitionLabel && (
         <div className="transition-overlay" aria-live="polite">
-          <div className="loading-orbit compact" aria-hidden="true">
-            <span />
-            <span />
-            <span />
+          <div className="loading-logo compact" aria-hidden="true">
+            <Logo size={68} loop />
           </div>
           <div className="loading-copy transition-copy">
             <h1>TikZ Studio</h1>
@@ -1825,12 +1994,13 @@ Start writing your TikZ code here.
           <aside className="file-rail" aria-label="Project navigation">
             <div className="rail-toolbar">
               <button
-                className="icon-button"
+                className="home-logo-button"
                 type="button"
                 aria-label="Home"
+                title="Home"
                 onClick={goToDashboard}
               >
-                <HomeIcon size={17} strokeWidth={2.5} />
+                <Logo size={34} />
               </button>
               <span className="rail-project-title" title={activeProject?.title}>
                 {activeProject?.title}
@@ -2034,6 +2204,7 @@ Start writing your TikZ code here.
                   className="tool-button"
                   type="button"
                   aria-label="Bold selected text"
+                  title={`Bold (${modKey}B)`}
                   aria-keyshortcuts="Control+B Meta+B"
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => applyTextCommand("textbf")}
@@ -2044,6 +2215,7 @@ Start writing your TikZ code here.
                   className="tool-button"
                   type="button"
                   aria-label="Italicize selected text"
+                  title={`Italic (${modKey}I)`}
                   aria-keyshortcuts="Control+I Meta+I"
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => applyTextCommand("textit")}
@@ -2054,13 +2226,21 @@ Start writing your TikZ code here.
                   className="tool-button boxed"
                   type="button"
                   aria-label="Underline selected text"
+                  title={`Underline (${modKey}U)`}
                   aria-keyshortcuts="Control+U Meta+U"
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => applyTextCommand("underline")}
                 >
                   <Underline size={18} />
                 </button>
-                <button className="tool-button boxed" type="button" aria-label="Roman style">
+                <button
+                  className="tool-button boxed"
+                  type="button"
+                  aria-label="Upright Roman text"
+                  title="Upright Roman text (\\textrm)"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => applyTextCommand("textrm")}
+                >
                   <Type size={18} />
                 </button>
               </div>
@@ -2132,7 +2312,21 @@ Start writing your TikZ code here.
                 onCursor={setCursorPosition}
                 onFormat={applyTextCommand}
                 onGenerateError={(text) => setUploadNotice({ tone: "error", text })}
+                onCompile={() => void handleRefreshPreview()}
               />
+            </div>
+            <div className="editor-status" aria-label="Editor status">
+              <span>
+                Ln {cursorLine}, Col {cursorColumn}
+              </span>
+              <span className="save-status">
+                <span className={`save-dot ${saveState.status}`} aria-hidden="true" />
+                {saveLabel}
+              </span>
+              <span className="editor-status-hint">
+                <kbd>{modKey}</kbd>
+                <kbd>↵</kbd> compile
+              </span>
             </div>
           </section>
 
@@ -2141,6 +2335,7 @@ Start writing your TikZ code here.
               <button
                 className="preview-refresh-button"
                 type="button"
+                title={`Recompile (${modKey}↵ or ${modKey}S)`}
                 onClick={handleRefreshPreview}
                 disabled={isRefreshingPreview}
                 aria-busy={isRefreshingPreview}
@@ -2160,34 +2355,78 @@ Start writing your TikZ code here.
               >
                 <Download size={23} />
               </button>
+              {compileChip && (
+                <span className={`compile-chip ${compileChip.tone}`} role="status" aria-live="polite">
+                  <span className="compile-chip-dot" aria-hidden="true" />
+                  {compileChip.label}
+                  {compileChip.tone === "stale" && (
+                    <span className="compile-chip-keys" aria-hidden="true">
+                      <kbd>{modKey}</kbd>
+                      <kbd>↵</kbd>
+                    </span>
+                  )}
+                </span>
+              )}
             </div>
 
             <div className="diagram-canvas" aria-label="TikZ diagram preview">
-              {isRefreshingPreview ? (
+              {compileOutput?.ok ? (
+                <div className={isPreviewStale ? "preview-frame stale" : "preview-frame"}>
+                  <iframe
+                    key={compileOutput.pdfObjectUrl}
+                    className="compiled-preview-pdf"
+                    src={compileOutput.pdfObjectUrl}
+                    title="Compiled LaTeX PDF preview"
+                  />
+                  {isRefreshingPreview && (
+                    <div className="preview-compiling-veil" role="status" aria-live="polite">
+                      <Logo size={56} loop />
+                      <p>Compiling LaTeX source</p>
+                    </div>
+                  )}
+                </div>
+              ) : isRefreshingPreview ? (
                 <div className="preview-loading-panel" role="status" aria-live="polite">
-                  <div className="loading-orbit compact" aria-hidden="true">
-                    <span />
-                    <span />
-                    <span />
-                  </div>
+                  <Logo size={72} loop />
                   <p>Compiling LaTeX source</p>
                 </div>
-              ) : compileOutput?.ok ? (
-                <iframe
-                  className="compiled-preview-pdf"
-                  src={compileOutput.pdfObjectUrl}
-                  title="Compiled LaTeX PDF preview"
-                />
               ) : compileOutput ? (
                 <div className="compile-output-panel" role="status" aria-live="polite">
-                  <h2>{compileOutput.message}</h2>
-                  {compileOutput.log ? <pre>{compileOutput.log}</pre> : <p>Check that the backend container is running.</p>}
+                  <div className="compile-error-head">
+                    <TriangleAlert size={20} aria-hidden="true" />
+                    <h2>{compileOutput.message}</h2>
+                  </div>
+                  {texError && (
+                    <div className="compile-error-card">
+                      <code>{texError.message}</code>
+                      {canJumpToError && (
+                        <button
+                          type="button"
+                          onClick={() => goToSourceLine(texError.file, texError.line as number)}
+                        >
+                          Go to line {texError.line}
+                          {texError.file ? ` in ${texError.file}` : ""}
+                          <ArrowRight size={15} aria-hidden="true" />
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {compileOutput.log ? (
+                    <details className="compile-log" open={!texError}>
+                      <summary>Full compiler log</summary>
+                      <pre>{compileOutput.log}</pre>
+                    </details>
+                  ) : (
+                    <p>Check that the backend container is running.</p>
+                  )}
                 </div>
               ) : (
                 <div className="preview-empty-panel">
-                  <FileText size={42} aria-hidden="true" />
+                  <Logo size={64} />
                   <h2>No compiled PDF yet</h2>
-                  <p>Press Recompile to send this project to the LaTeX backend.</p>
+                  <p>
+                    Press Recompile or <kbd>{modKey}</kbd> <kbd>↵</kbd> to see your document here.
+                  </p>
                 </div>
               )}
             </div>

@@ -1,83 +1,87 @@
 :root {
   color-scheme: light;
-  /* Light, "ivory dusk". Surfaces: warm ivory; --sunken is where you write (fields, editor). */
-  --page: #f6f3f0;
-  --sunken: #fffdfb;
-  --panel: #fbf9f7;
-  --panel-soft: #f2eef0;
-  --raised: #e8e2e7;
-  /* Text: plum-tinted ink, never pure black. */
-  --ink: #2b2a3d;
-  --ink-strong: #1c1b2c;
-  --muted: #6e6b85;
-  --subtle: #a09cb2;
-  /* Accents: dusk indigo with an apricot glow. */
-  --accent: #6866c4;
-  --accent-strong: #5654ad;
-  --accent-ink: #ffffff; /* text on accent fills */
-  --warm: #e08e74;
-  --sage: #5f9e8a;
-  --rose: #c65b78;
-  /* The login panel is 300% wide and only a sixth shows at a time, so hues run horizontally around
-     those slices and the apricot "horizon" is a vertical layer that looks the same at any position. */
-  --hero:
-    linear-gradient(to top, rgb(246 178 148 / 0.62) 0%, rgb(246 178 148 / 0.18) 38%, transparent 70%),
-    linear-gradient(90deg, #5d5bbf 0%, #7a69c6 16.7%, #8a73c4 50%, #7a69c6 83.3%, #5d5bbf 100%);
+  /* Light, "glacier": cool ice-blue paper; --sunken is where you write (fields, editor). Gradients are blended
+     in OKLCH and baked into many stops, so they stay clear (no grey middle) in every browser. Every text colour,
+     including the editor's syntax colours and text on gradients, passes WCAG AA on what it sits on.
+     Source and alternatives: rough stuff/gradients.html. */
+  --page: #eff6f9;
+  --sunken: #fbfdfe;
+  --panel: #f6fbfd;
+  --panel-soft: #e5eef2;
+  --raised: #d9e2e7;
+  --ink: #25363d;
+  --ink-strong: #14252b;
+  --muted: #5b696f;
+  --subtle: #838e94;
+  --accent: #077a9e;
+  --accent-strong: #076482;
+  --accent-ink: #ffffff; /* text on accent fills, readable at every point of --accent-fill */
+  --warm: #ac5c2e;
+  --sage: #417f45;
+  --rose: #bf4b55;
+  --lilac: #6e6ab2;
+  /* Filled accents (primary buttons, active file, selected tabs): one ice hue, light at the top, deep below. */
+  --accent-fill: linear-gradient(180deg, #0f7da1, #06779c, #167194, #106b90, #09668b, #026086, #0e5b7e, #08557a, #025075);
+  --accent-fill-hover: linear-gradient(180deg, #0b7191, #036b8c, #116585, #0a5f81, #035a7c, #0d5474, #074f6f, #024a6b, #074564);
+  /* Vertical, so the 300%-wide login panel looks the same at whichever slice is showing. */
+  --hero: linear-gradient(180deg, #167ca0, #11789c, #0b7398, #046f95, #146a8e, #0f668a, #0a6186, #055d82, #00597f, #0c5478, #075074);
   --auth-backdrop:
-    radial-gradient(55% 60% at 12% 8%, rgb(122 116 214 / 0.16), transparent 70%),
-    radial-gradient(50% 55% at 92% 95%, rgb(240 160 128 / 0.18), transparent 70%),
+    radial-gradient(55% 60% at 12% 8%, rgb(55 172 217 / 0.14), transparent 70%),
+    radial-gradient(50% 55% at 92% 95%, rgb(75 168 224 / 0.112), transparent 70%),
     var(--page);
-  --hero-ink: #fffaf6;
-  --hero-em: #ffe1cf;
+  --hero-ink: #ffffff;
+  --hero-em: #b1e9f7;
+  --ink-rgb: 37 54 61;
+  --accent-rgb: 7 122 158;
+  --warm-rgb: 172 92 46;
+  --sage-rgb: 65 127 69;
+  --mauve-rgb: 148 160 221;
+  --rose-rgb: 191 75 85;
+  --page-rgb: 239 246 249;
+  --shadow-rgb: 24 49 63;
   --line: rgb(var(--ink-rgb) / 0.12);
   --line-soft: rgb(var(--ink-rgb) / 0.07);
   --focus: rgb(var(--warm-rgb) / 0.75);
-  /* Channels for translucent tints: rgb(var(--x-rgb) / alpha). */
-  --ink-rgb: 43 42 61;
-  --accent-rgb: 104 102 196;
-  --warm-rgb: 224 142 116;
-  --sage-rgb: 95 158 138;
-  --mauve-rgb: 196 150 190;
-  --rose-rgb: 198 91 120;
-  --page-rgb: 246 243 240;
-  --shadow-rgb: 60 48 80;
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  /* Dark, "night dusk": deep plum-ink, same hues lifted and softened. */
-  --page: #16151f;
-  --sunken: #110f19;
-  --panel: #1c1a27;
-  --panel-soft: #22202f;
-  --raised: #2c2a3c;
-  --ink: #e8e5f2;
-  --ink-strong: #f7f5fc;
-  --muted: #a19db8;
-  --subtle: #6f6b88;
-  --accent: #a7a5f2;
-  --accent-strong: #c0befa;
-  --accent-ink: #191830;
-  --warm: #f2ad92;
-  --sage: #93ccb8;
-  --rose: #f0a0b6;
-  --hero:
-    linear-gradient(to top, rgb(214 136 116 / 0.5) 0%, rgb(214 136 116 / 0.14) 38%, transparent 70%),
-    linear-gradient(90deg, #403e95 0%, #55499e 16.7%, #604f9f 50%, #55499e 83.3%, #403e95 100%);
+  /* Dark, "glacier at night": deep blue-black, ice light glowing from the accents. */
+  --page: #0f171b;
+  --sunken: #091014;
+  --panel: #171f23;
+  --panel-soft: #1e262a;
+  --raised: #262f33;
+  --ink: #cbdae2;
+  --ink-strong: #d8e7ef;
+  --muted: #95a8b1;
+  --subtle: #6d7d85;
+  --accent: #49a4ca;
+  --accent-strong: #5db7de;
+  --accent-ink: #011923; /* text on accent fills, readable at every point of --accent-fill */
+  --warm: #cc845f;
+  --sage: #73a874;
+  --rose: #dc757a;
+  --lilac: #9897d5;
+  /* Filled accents (primary buttons, active file, selected tabs): one ice hue, light at the top, deep below. */
+  --accent-fill: linear-gradient(180deg, #6ec8ee, #69c1e9, #65bbe4, #61b5df, #5cafda, #58a9d5, #54a4d0, #509ecb, #4c98c6);
+  --accent-fill-hover: linear-gradient(180deg, #7bd5fb, #76cef6, #72c8f1, #6ec2ec, #69bce7, #65b6e2, #61b1dd, #5dabd8, #59a4d3);
+  /* Vertical, so the 300%-wide login panel looks the same at whichever slice is showing. */
+  --hero: linear-gradient(180deg, #086482, #02607e, #0e5b78, #095774, #045371, #0c4e6a, #074a67, #034663, #09425d, #053e59, #023a56);
   --auth-backdrop:
-    radial-gradient(55% 60% at 12% 8%, rgb(120 112 220 / 0.14), transparent 70%),
-    radial-gradient(50% 55% at 92% 95%, rgb(220 140 120 / 0.1), transparent 70%),
+    radial-gradient(55% 60% at 12% 8%, rgb(55 172 217 / 0.1), transparent 70%),
+    radial-gradient(50% 55% at 92% 95%, rgb(75 168 224 / 0.080), transparent 70%),
     var(--page);
-  --hero-ink: #fbf7ff;
-  --hero-em: #ffd9c4;
-  --ink-rgb: 232 229 242;
-  --accent-rgb: 167 165 242;
-  --warm-rgb: 242 173 146;
-  --sage-rgb: 147 204 184;
-  --mauve-rgb: 190 150 210;
-  --rose-rgb: 240 160 182;
-  --page-rgb: 22 21 31;
-  --shadow-rgb: 0 0 6;
+  --hero-ink: #eff7fa;
+  --hero-em: #a2e4f4;
+  --ink-rgb: 203 218 226;
+  --accent-rgb: 73 164 202;
+  --warm-rgb: 204 132 95;
+  --sage-rgb: 115 168 116;
+  --mauve-rgb: 156 167 222;
+  --rose-rgb: 220 117 122;
+  --page-rgb: 15 23 27;
+  --shadow-rgb: 0 3 6;
 }
 
 * {
@@ -366,6 +370,9 @@ a {
 }
 
 .dashboard-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   align-self: end;
   color: var(--ink);
   font-weight: 900;
@@ -418,7 +425,7 @@ a {
 
 .project-search {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr);
+  grid-template-columns: 24px minmax(0, 1fr) auto;
   align-items: center;
   width: min(960px, 100%);
   min-height: 48px;
@@ -728,6 +735,7 @@ a {
 .workspace-grid {
   /* One height for the file, editor and preview top bars so their bottom borders line up. */
   --bar-height: 60px;
+  --status-height: 30px;
   display: grid;
   grid-template-columns: 232px minmax(360px, 1.08fr) minmax(420px, 0.92fr);
   min-height: 100vh;
@@ -759,6 +767,44 @@ a {
   width: 32px;
   height: 32px;
   flex: none;
+}
+
+/* The logo is the home button: it lifts on hover and replays its story (animations live in Logo.css). */
+.home-logo-button {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  cursor: pointer;
+  filter: drop-shadow(0 4px 8px rgb(var(--shadow-rgb) / 0.22));
+  transition:
+    transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+    filter 0.3s;
+}
+
+.home-logo-button:hover {
+  filter: drop-shadow(0 6px 12px rgb(var(--accent-rgb) / 0.35));
+  transform: translateY(-1px) scale(1.06);
+}
+
+.home-logo-button:active {
+  transform: scale(0.96);
+}
+
+.home-logo-button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-logo-button {
+    transition: none;
+  }
 }
 
 .rail-project-title {
@@ -871,7 +917,7 @@ textarea:focus-visible {
 
 .file-row.active {
   border-left-color: var(--warm);
-  background: var(--accent);
+  background: var(--accent-fill);
 }
 
 .file-link {
@@ -1354,7 +1400,7 @@ button.outline-toggle:hover {
 }
 
 .code-surface {
-  height: calc(100vh - var(--bar-height));
+  height: calc(100vh - var(--bar-height) - var(--status-height));
   min-height: 540px;
   overflow: hidden;
   background: var(--sunken);
@@ -1432,7 +1478,7 @@ button.outline-toggle:hover {
   padding: 12px;
 }
 
-.compiled-preview-pdf { 
+.compiled-preview-pdf {
   width: 100%;
   max-width: 100%;
   height: 100%;
@@ -1447,7 +1493,9 @@ button.outline-toggle:hover {
   display: grid;
   height: 100%;
   min-height: 360px;
-  place-items: center;
+  place-content: center;
+  justify-items: center;
+  gap: 16px;
   overflow: hidden;
   border: 1px solid rgb(var(--ink-rgb) / 0.14);
   border-radius: 8px;
@@ -1458,8 +1506,7 @@ button.outline-toggle:hover {
 }
 
 .preview-loading-panel p {
-  position: absolute;
-  margin-top: 212px;
+  margin: 0;
   color: var(--muted);
   font-weight: 800;
 }
@@ -1468,8 +1515,9 @@ button.outline-toggle:hover {
   display: grid;
   width: 100%;
   max-height: 100%;
-  gap: 12px;
-  overflow: hidden;
+  align-content: start;
+  gap: 14px;
+  overflow: auto;
   padding: 18px;
   border: 1px solid rgb(var(--rose-rgb) / 0.34);
   border-radius: 8px;
@@ -1693,13 +1741,13 @@ button.outline-toggle:hover {
   }
 }
 
-/* ─── Accents: primary actions and selected states share the periwinkle. ─── */
+/* ─── Accents: primary actions and selected states share the accent gradient. ─── */
 
 .new-project-button,
 .preview-refresh-button,
 .modal-actions button:not(.secondary) {
   border-color: transparent;
-  background: var(--accent);
+  background: var(--accent-fill);
   color: var(--accent-ink);
 }
 
@@ -1707,7 +1755,7 @@ button.outline-toggle:hover {
 .preview-refresh-button:hover:not(:disabled),
 .modal-actions button:not(.secondary):hover {
   border-color: transparent;
-  background: var(--accent-strong);
+  background: var(--accent-fill-hover);
 }
 
 .dashboard-nav-item.active,
@@ -1839,6 +1887,12 @@ button.outline-toggle:hover {
   letter-spacing: 0.01em;
 }
 
+.auth-logo {
+  display: flex;
+  margin-bottom: 14px;
+  filter: drop-shadow(0 8px 14px rgb(var(--shadow-rgb) / 0.22));
+}
+
 .auth-card p.auth-eyebrow {
   margin: 0 0 12px;
   color: var(--warm);
@@ -1906,7 +1960,7 @@ button.outline-toggle:hover {
   letter-spacing: 0.01em;
   border: none;
   border-radius: 10px;
-  background: var(--accent);
+  background: var(--accent-fill);
   color: var(--accent-ink);
   font-size: 1rem;
   font-weight: 650;
@@ -1915,7 +1969,7 @@ button.outline-toggle:hover {
 }
 
 .auth-btn:hover:not(:disabled) {
-  background: var(--accent-strong);
+  background: var(--accent-fill-hover);
 }
 
 .auth-btn:disabled {
@@ -2234,4 +2288,487 @@ button.outline-toggle:hover {
 .auth-toggle-panel p {
   max-width: 300px;
   line-height: 1.5;
+}
+
+/* ───────────────────────── Polish: motion, feedback and small helpers ───────────────────────── */
+
+kbd {
+  display: inline-grid;
+  min-width: 1.6em;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--panel-soft);
+  color: var(--muted);
+  font: 600 0.72rem/1.5 "SFMono-Regular", Consolas, monospace;
+  padding: 0 4px;
+}
+
+/* Loading and page-transition screens: the logo retells its story in a soft glow. */
+.loading-logo {
+  position: relative;
+  display: grid;
+  width: 156px;
+  height: 156px;
+  place-items: center;
+  filter: drop-shadow(0 18px 30px rgb(var(--accent-rgb) / 0.35));
+}
+
+.loading-logo.compact {
+  width: 132px;
+  height: 132px;
+}
+
+.loading-logo::before {
+  position: absolute;
+  inset: 18px;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(var(--accent-rgb) / 0.22), transparent);
+  content: "";
+  animation: soft-breathe 2.8s ease-in-out infinite;
+}
+
+@keyframes soft-breathe {
+  50% {
+    opacity: 0.45;
+    transform: scale(1.15);
+  }
+}
+
+/* Toast: floats over the page instead of pushing it down; errors stay until dismissed. */
+.upload-notice {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  z-index: 60;
+  display: flex;
+  width: max-content;
+  max-width: min(560px, calc(100vw - 32px));
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--sage);
+  border-radius: 12px;
+  background: var(--raised);
+  box-shadow: 0 18px 40px -18px rgb(var(--shadow-rgb) / 0.5);
+  color: var(--ink);
+  font-weight: 650;
+  padding: 10px 10px 10px 16px;
+  translate: -50% 0;
+  animation: toast-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.upload-notice.error {
+  border-left-color: var(--rose);
+}
+
+.upload-notice p {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.upload-notice button {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.upload-notice button:hover {
+  background: var(--panel-soft);
+  color: var(--ink);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    translate: -50% -14px;
+    scale: 0.96;
+  }
+}
+
+/* Save status: a dot that breathes while saving. */
+.save-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.save-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--sage);
+  box-shadow: 0 0 0 3px rgb(var(--sage-rgb) / 0.18);
+  transition: background 0.3s;
+}
+
+.save-dot.saving {
+  background: var(--warm);
+  box-shadow: 0 0 0 3px rgb(var(--warm-rgb) / 0.2);
+  animation: dot-pulse 1s ease-in-out infinite;
+}
+
+.save-dot.error {
+  background: var(--rose);
+  box-shadow: 0 0 0 3px rgb(var(--rose-rgb) / 0.2);
+}
+
+@keyframes dot-pulse {
+  50% {
+    opacity: 0.4;
+    scale: 0.75;
+  }
+}
+
+/* Dashboard: "/" hint in search, rows slide in, empty state with a way forward. */
+.search-kbd {
+  color: var(--subtle);
+}
+
+/* The whole search box shows focus, rather than a hard rectangle around the inner input. */
+.project-search {
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+
+.project-search:focus-within {
+  border-color: rgb(var(--accent-rgb) / 0.55);
+  box-shadow: 0 0 0 4px rgb(var(--accent-rgb) / 0.12);
+}
+
+.project-search input:focus-visible {
+  outline: none;
+}
+
+.project-search:focus-within .search-kbd {
+  opacity: 0;
+}
+
+.project-row {
+  transition: background 0.2s;
+  animation: row-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) calc(var(--i, 0) * 40ms) both;
+}
+
+.project-row:hover {
+  background: rgb(var(--accent-rgb) / 0.05);
+}
+
+@keyframes row-in {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+  }
+}
+
+.projects-empty {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 44px 16px 48px;
+  text-align: center;
+  animation: row-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.projects-empty h2 {
+  margin: 8px 0 0;
+  color: var(--ink);
+  font-size: 1.1rem;
+}
+
+.projects-empty p {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.projects-empty .new-project-button {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 8px;
+  border-radius: 9px;
+  font-weight: 750;
+  padding: 0 16px;
+  cursor: pointer;
+}
+
+/* Dialogs and menus arrive instead of appearing. */
+.modal-backdrop {
+  backdrop-filter: blur(4px);
+  animation: fade-in 0.25s ease-out both;
+}
+
+.new-project-modal {
+  animation: dialog-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.profile-menu,
+.file-options-menu {
+  transform-origin: top right;
+  animation: menu-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.profile-menu {
+  transform-origin: bottom center;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    translate: 0 14px;
+    scale: 0.96;
+  }
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    translate: 0 4px;
+    scale: 0.96;
+  }
+}
+
+/* Primary buttons press in. */
+.new-project-button:active,
+.preview-refresh-button:active:not(:disabled),
+.modal-actions button:active,
+.auth-btn:active:not(:disabled) {
+  scale: 0.97;
+}
+
+.new-project-button,
+.preview-refresh-button,
+.modal-actions button,
+.auth-btn {
+  transition:
+    scale 0.15s,
+    background 0.2s,
+    box-shadow 0.2s;
+}
+
+/* Editor status bar. */
+.editor-status {
+  display: flex;
+  height: var(--status-height);
+  align-items: center;
+  gap: 18px;
+  overflow: hidden;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  padding: 0 16px;
+  white-space: nowrap;
+}
+
+.editor-status-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+/* Compile status chip in the preview toolbar. */
+.compile-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 4px 11px;
+  white-space: nowrap;
+  animation: fade-in 0.3s ease-out both;
+}
+
+.compile-chip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--subtle);
+}
+
+.compile-chip.ok .compile-chip-dot {
+  background: var(--sage);
+}
+
+.compile-chip.stale {
+  border-color: rgb(var(--warm-rgb) / 0.4);
+  color: var(--ink);
+}
+
+.compile-chip.stale .compile-chip-dot,
+.compile-chip.busy .compile-chip-dot {
+  background: var(--warm);
+}
+
+.compile-chip.busy .compile-chip-dot {
+  animation: dot-pulse 0.9s ease-in-out infinite;
+}
+
+.compile-chip.error {
+  border-color: rgb(var(--rose-rgb) / 0.4);
+  color: var(--rose);
+}
+
+.compile-chip.error .compile-chip-dot {
+  background: var(--rose);
+}
+
+.compile-chip-keys {
+  display: inline-flex;
+  gap: 2px;
+}
+
+/* The PDF stays while compiling (under a veil) and while the source moves ahead of it (slightly muted). */
+.preview-frame {
+  position: relative;
+  display: grid;
+  min-height: 0;
+}
+
+.preview-frame .compiled-preview-pdf {
+  animation: pdf-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  transition: filter 0.4s;
+}
+
+.preview-frame.stale .compiled-preview-pdf {
+  filter: saturate(0.55) brightness(0.97);
+}
+
+.preview-compiling-veil {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  border-radius: 8px;
+  background: rgb(var(--page-rgb) / 0.62);
+  backdrop-filter: blur(3px);
+  color: var(--ink);
+  font-weight: 750;
+  animation: fade-in 0.25s ease-out both;
+}
+
+.preview-compiling-veil p {
+  margin: 0;
+}
+
+@keyframes pdf-in {
+  from {
+    opacity: 0;
+    scale: 0.985;
+  }
+}
+
+/* Compile errors: the message, the first TeX error with a jump to its line, then the full log. */
+.compile-error-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--rose);
+}
+
+.compile-error-card {
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgb(var(--rose-rgb) / 0.3);
+  border-radius: 10px;
+  background: rgb(var(--rose-rgb) / 0.07);
+  padding: 12px 14px;
+  animation: row-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.compile-error-card code {
+  color: var(--ink);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.compile-error-card button {
+  display: inline-flex;
+  justify-self: start;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent-fill);
+  color: var(--accent-ink);
+  cursor: pointer;
+  font-weight: 700;
+  padding: 7px 12px;
+  transition: scale 0.15s;
+}
+
+.compile-error-card button:hover {
+  background: var(--accent-fill-hover);
+}
+
+.compile-error-card button:active {
+  scale: 0.97;
+}
+
+.compile-log {
+  display: grid;
+  min-height: 0;
+  gap: 8px;
+}
+
+.compile-log summary {
+  color: var(--muted);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.compile-log pre {
+  max-height: 50vh;
+}
+
+.preview-empty-panel kbd {
+  margin: 0 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-logo::before,
+  .upload-notice,
+  .save-dot.saving,
+  .project-row,
+  .projects-empty,
+  .modal-backdrop,
+  .new-project-modal,
+  .profile-menu,
+  .file-options-menu,
+  .compile-chip,
+  .compile-chip.busy .compile-chip-dot,
+  .preview-frame .compiled-preview-pdf,
+  .preview-compiling-veil,
+  .compile-error-card {
+    animation: none;
+  }
 }

@@ -10,12 +10,12 @@ import {
   Minimize2,
   PenLine,
   RefreshCw,
-  Sparkles,
   TriangleAlert,
   WandSparkles,
   X,
 } from "lucide-react";
 import { apiFetch, apiJson, errorMessage } from "./api";
+import Logo from "./Logo";
 import "./FigureChat.css";
 
 type ProjectFile = { name: string; content: string };
@@ -96,8 +96,11 @@ function Generating({ revision }: { revision: boolean }) {
             <i key={index} style={{ width: `${width}%`, "--i": index } as CSSProperties} />
           ))}
         </div>
+        {/* The logo retells its story (code → figure → sparkle) for as long as the model is working. */}
         <div className="fs-canvas">
-          <Sketch className="fs-sketch-canvas" />
+          <div className="fs-gen-logo">
+            <Logo size={96} loop />
+          </div>
         </div>
       </div>
     </div>
@@ -261,8 +264,9 @@ export default function FigureChat({ open, files, activeFileName, onClose }: Pro
         <div className="fs-aurora" aria-hidden="true" />
 
         <header className="fs-header">
-          <span className="fs-badge" aria-hidden="true">
-            <Sparkles size={17} />
+          {/* Mounted only while open, so the logo plays its story each time Figure Studio opens. */}
+          <span className="fs-logo" aria-hidden="true">
+            {open && <Logo size={38} />}
           </span>
           <div className="fs-heading">
             <h2 id="fs-title">Figure Studio</h2>
@@ -311,8 +315,9 @@ export default function FigureChat({ open, files, activeFileName, onClose }: Pro
                 </div>
 
                 <div className="fs-assistant">
+                  {/* Loops while this reply is being generated, then settles into the finished mark. */}
                   <span className={turn.pending ? "fs-avatar thinking" : "fs-avatar"} aria-hidden="true">
-                    <Sparkles size={14} />
+                    <Logo size={30} loop={Boolean(turn.pending)} />
                   </span>
                   <div className="fs-reply">
                     {turn.pending && <Generating revision={turn.isRevision} />}

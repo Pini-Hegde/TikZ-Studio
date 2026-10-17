@@ -1,0 +1,181 @@
+/* Logo animation (app/Logo.tsx). The story plays once when the logo mounts: braces draw in, the diagram grows
+   from its base node, the sparkle bursts at the peak. After that only the sparkle, its glow and the small star
+   move, gently and slowly, so the logo never competes with the editor. */
+
+/* Between looped rounds the drawing (not the tile) fades out before it is drawn again. */
+.lg .art {
+  transition: opacity 0.45s ease;
+}
+
+.lg .art.out {
+  opacity: 0;
+}
+
+.lg .ln {
+  fill: none;
+  stroke: #ffffff;
+  stroke-dasharray: 1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.lg .brace,
+.lg .node,
+.lg .glow,
+.lg .spark,
+.lg .core,
+.lg .mini {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.lg-bloom .brace-l {
+  animation:
+    lg-draw 0.6s cubic-bezier(0.65, 0, 0.35, 1) both,
+    lg-slide-l 0.6s ease-out both;
+}
+
+.lg-bloom .brace-r {
+  animation:
+    lg-draw 0.6s cubic-bezier(0.65, 0, 0.35, 1) both,
+    lg-slide-r 0.6s ease-out both;
+}
+
+.lg-bloom .n1 {
+  animation: lg-pop 0.5s 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.lg-bloom .e1,
+.lg-bloom .e2 {
+  animation: lg-draw 0.35s 0.65s ease-out both;
+}
+
+.lg-bloom .n2,
+.lg-bloom .n3 {
+  animation: lg-pop 0.4s 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.lg-bloom .e3,
+.lg-bloom .e4 {
+  animation: lg-draw 0.35s 1s ease-out both;
+}
+
+.lg-bloom .glow {
+  animation:
+    lg-fade 0.6s 1.35s both,
+    lg-pulse 4.5s 2.8s ease-in-out infinite;
+}
+
+.lg-bloom .spark {
+  animation:
+    lg-burst 0.75s 1.3s cubic-bezier(0.34, 1.56, 0.64, 1) both,
+    lg-twinkle 5s 3s ease-in-out infinite;
+}
+
+.lg-bloom .core {
+  animation: lg-pop 0.35s 1.7s both;
+}
+
+.lg-bloom .mini {
+  animation:
+    lg-pop 0.45s 1.9s cubic-bezier(0.34, 1.56, 0.64, 1) both,
+    lg-mini 2.4s 2.5s ease-in-out infinite alternate;
+}
+
+@keyframes lg-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes lg-slide-l {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+}
+
+@keyframes lg-slide-r {
+  from {
+    opacity: 0;
+    transform: translateX(6px);
+  }
+}
+
+@keyframes lg-pop {
+  from {
+    opacity: 0;
+    transform: scale(0);
+  }
+
+  70% {
+    opacity: 1;
+    transform: scale(1.18);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes lg-burst {
+  from {
+    opacity: 0;
+    transform: scale(0) rotate(-120deg);
+  }
+
+  65% {
+    opacity: 1;
+    transform: scale(1.3) rotate(12deg);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+}
+
+@keyframes lg-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes lg-pulse {
+  50% {
+    opacity: 0.5;
+    transform: scale(0.85);
+  }
+}
+
+/* A quick twinkle at the start of each 5s period, so a looped round (story + pause) still shows one. */
+@keyframes lg-twinkle {
+  0%,
+  16%,
+  100% {
+    transform: scale(1) rotate(0);
+  }
+
+  8% {
+    transform: scale(1.16) rotate(45deg);
+  }
+}
+
+@keyframes lg-mini {
+  to {
+    opacity: 0.4;
+    transform: scale(0.55) rotate(45deg);
+  }
+}
+
+/* Reduced motion: the finished logo, no movement. */
+@media (prefers-reduced-motion: reduce) {
+  .lg * {
+    animation: none !important;
+  }
+}

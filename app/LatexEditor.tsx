@@ -11,6 +11,8 @@ import { stex } from "@codemirror/legacy-modes/mode/stex";
 import { tags } from "@lezer/highlight";
 import { apiJson, errorMessage } from "./api";
 
+export type FormatCommand = "textbf" | "textit" | "underline" | "textrm";
+
 /** The slice of the old <textarea> API that page.tsx relies on. */
 export type LatexEditorHandle = {
   focus: () => void;
@@ -24,8 +26,9 @@ type Props = {
   value: string;
   onChange: (value: string) => void;
   onCursor: (position: number) => void;
-  onFormat: (command: "textbf" | "textit" | "underline") => void;
+  onFormat: (command: FormatCommand) => void;
   onGenerateError: (message: string) => void;
+  onCompile: () => void;
   ref?: Ref<LatexEditorHandle>;
 };
 
@@ -183,7 +186,7 @@ const generateOnEnter = (view: EditorView, onError: (message: string) => void) =
 // Colours come from the project palette tokens, so light/dark switch with data-theme.
 const highlight = HighlightStyle.define([
   { tag: tags.tagName, color: "var(--accent)", fontWeight: "600" },
-  { tag: [tags.atom, tags.special(tags.variableName)], color: "var(--sage)" },
+  { tag: [tags.atom, tags.special(tags.variableName)], color: "var(--lilac)" },
   { tag: tags.keyword, color: "var(--warm)" },
   { tag: tags.bracket, color: "var(--muted)" },
   { tag: tags.number, color: "var(--rose)" },
@@ -210,7 +213,7 @@ const theme = EditorView.theme({
   ".cm-tooltip": { backgroundColor: "var(--raised)", border: "1px solid var(--line)", borderRadius: "8px", overflow: "hidden" },
   ".cm-tooltip-autocomplete > ul": { fontFamily: "inherit", maxHeight: "16em" },
   ".cm-tooltip-autocomplete > ul > li": { padding: "3px 10px !important" },
-  ".cm-tooltip-autocomplete > ul > li[aria-selected]": { backgroundColor: "var(--accent)", color: "var(--accent-ink)" },
+  ".cm-tooltip-autocomplete > ul > li[aria-selected]": { background: "var(--accent-fill)", color: "var(--accent-ink)" },
   ".cm-completionDetail": { color: "var(--muted)", fontStyle: "normal", marginLeft: "12px" },
   ".cm-tooltip-autocomplete > ul > li[aria-selected] .cm-completionDetail": { color: "inherit", opacity: 0.8 },
   ".cm-completionMatchedText": { textDecoration: "none", fontWeight: "700" },
@@ -218,16 +221,16 @@ const theme = EditorView.theme({
   ".cm-panels": { backgroundColor: "var(--panel)", color: "var(--ink)" },
 });
 
-export default function LatexEditor({ docId, value, onChange, onCursor, onFormat, onGenerateError, ref }: Props) {
+export default function LatexEditor({ docId, value, onChange, onCursor, onFormat, onGenerateError, onCompile, ref }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   // One EditorState per file keeps each file's own undo history across switches.
   const statesRef = useRef(new Map<string, EditorState>());
   const docIdRef = useRef(docId);
   const syncingRef = useRef(false);
-  const callbacks = useRef({ onChange, onCursor, onFormat, onGenerateError });
+  const callbacks = useRef({ onChange, onCursor, onFormat, onGenerateError, onCompile });
   useLayoutEffect(() => {
-    callbacks.current = { onChange, onCursor, onFormat, onGenerateError };
+    callbacks.current = { onChange, onCursor, onFormat, onGenerateError, onCompile };
   });
 
   const makeState = (doc: string) =>
@@ -253,6 +256,9 @@ export default function LatexEditor({ docId, value, onChange, onCursor, onFormat
             { key: "Mod-b", run: () => (callbacks.current.onFormat("textbf"), true) },
             { key: "Mod-i", run: () => (callbacks.current.onFormat("textit"), true) },
             { key: "Mod-u", run: () => (callbacks.current.onFormat("underline"), true) },
+            // Compile like Overleaf: Mod-Enter, and Mod-s (which would otherwise open the browser's save dialog).
+            { key: "Mod-Enter", run: () => (callbacks.current.onCompile(), true) },
+            { key: "Mod-s", run: () => (callbacks.current.onCompile(), true) },
           ]),
         ),
         keymap.of([indentWithTab]),

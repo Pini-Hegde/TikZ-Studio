@@ -1,6 +1,7 @@
 import { useState, type CSSProperties } from "react";
 import { Lock, Mail } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
+import Logo from "./Logo";
 import { apiJson, errorMessage, type User } from "./api";
 
 type AuthScreenProps = {
@@ -122,6 +123,9 @@ export default function AuthScreen({ error, onSignedIn }: AuthScreenProps) {
             void submit();
           }}
         >
+          <div className="auth-logo">
+            <Logo size={48} loop />
+          </div>
           <p className="auth-eyebrow">
             <span className="auth-type">{opening}</span>
           </p>
