@@ -8,6 +8,7 @@ RUN apt-get update \
       texlive-latex-base \
       texlive-latex-extra \
       texlive-pictures \
+      poppler-utils \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --uid 1000 --no-create-home app
 

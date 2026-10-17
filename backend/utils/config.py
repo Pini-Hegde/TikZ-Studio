@@ -39,6 +39,14 @@ MAX_PROJECT_BYTES = env_int("MAX_PROJECT_BYTES", 2 * 1024 * 1024)
 MAX_PDF_BYTES = env_int("MAX_PDF_BYTES", 10 * 1024 * 1024)
 MAX_LOG_CHARS = env_int("MAX_LOG_CHARACTERS", 24_000)
 
-# Groq (OpenAI-compatible) for `! instruction !` code generation. Unset key = feature answers 503.
+# Groq (OpenAI-compatible) for `/! instruction !/` code generation. Unset key = feature answers 503.
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
+
+# TikZ figure generation: any OpenAI-compatible chat endpoint, e.g. vLLM serving our own weights at
+# http://model-host:8000/v1/chat/completions. Unset = falls back to Groq; neither = feature answers 503.
+TIKZ_MODEL_URL = os.environ.get("TIKZ_MODEL_URL") or (GROQ_URL if GROQ_API_KEY else "")
+TIKZ_MODEL_API_KEY = os.environ.get("TIKZ_MODEL_API_KEY", "" if os.environ.get("TIKZ_MODEL_URL") else GROQ_API_KEY)
+TIKZ_MODEL = os.environ.get("TIKZ_MODEL", GROQ_MODEL)
+TIKZ_VARIANTS = env_int("TIKZ_VARIANTS", 10)

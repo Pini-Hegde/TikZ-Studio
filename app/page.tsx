@@ -11,7 +11,6 @@ import {
   Copy,
   Download,
   FileText,
-  FilePlus2,
   HomeIcon,
   Italic,
   LogOut,
@@ -20,6 +19,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Sparkles,
   Tag,
   Trash2,
   Type,
@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import AuthScreen from "./AuthScreen";
 import ThemeToggle from "./ThemeToggle";
+import FigureChat from "./FigureChat";
 import LatexEditor, { type LatexEditorHandle } from "./LatexEditor";
 import { buildOutline, type OutlineItem } from "./latexOutline";
 import { ImportError, MAX_FILE_COUNT, MAX_PROJECT_BYTES, importUploads } from "./projectImport";
@@ -352,6 +353,7 @@ export default function Home() {
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectWarning, setNewProjectWarning] = useState("");
   const [isNewTagModalOpen, setIsNewTagModalOpen] = useState(false);
+  const [isFigureModalOpen, setIsFigureModalOpen] = useState(false);
   const [newTagName, setNewTagName] = useState("");
   const [newTagWarning, setNewTagWarning] = useState("");
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
@@ -1864,8 +1866,14 @@ Start writing your TikZ code here.
                 >
                   <Plus size={15} strokeWidth={2.6} />
                 </button>
-                <button className="panel-action" type="button" aria-label="Add folder" title="New folder">
-                  <FilePlus2 size={15} strokeWidth={2.4} />
+                <button
+                  className="panel-action"
+                  type="button"
+                  aria-label="Generate TikZ figure"
+                  title="Generate TikZ figure"
+                  onClick={() => setIsFigureModalOpen(true)}
+                >
+                  <Sparkles size={15} strokeWidth={2.4} />
                 </button>
               </div>
               {projectFiles.map((file) => (
@@ -2186,6 +2194,15 @@ Start writing your TikZ code here.
           </section>
         </div>
       </section>
+
+      {/* Stays mounted while closed so the conversation survives; a new project starts a fresh one. */}
+      <FigureChat
+        key={activeProject?.id}
+        open={isFigureModalOpen}
+        files={projectFiles.map(({ name, content }) => ({ name, content }))}
+        activeFileName={fileName}
+        onClose={() => setIsFigureModalOpen(false)}
+      />
     </main>
   );
 }

@@ -187,11 +187,12 @@ backend/
 │   ├── errors.py      # AppError + the standard JSON error response
 │   ├── security.py    # request guard (ids, CSRF origin check, body limit, rate limits, headers)
 │   ├── supabase.py    # minimal Supabase REST client
+│   ├── model.py       # chat call to any OpenAI-compatible model server (Groq or our own weights)
 │   └── auth.py        # session cookies, access_token / current_user dependencies
 ├── auth/              # POST signup, login, refresh, logout; GET me   (/api/v1/auth/...)
 ├── compiler/          # POST /api/v1/compile (signed-in users only)
 ├── projects/          # GET /api/v1/projects, PUT/DELETE /api/v1/projects/{uuid}
-├── generate/          # POST /api/v1/generate   (not built yet, returns 501)
+├── generate/          # POST /api/v1/generate (`/! … !/` → LaTeX), POST /api/v1/generate/tikz (prompt → 10 TikZ variants)
 └── tests/
 ```
 

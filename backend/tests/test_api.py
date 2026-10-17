@@ -187,7 +187,7 @@ def test_generate(monkeypatch):
     import io
     import json
 
-    from generate import router as generate
+    from utils import model
 
     signed_in()
     monkeypatch.setattr(config, "GROQ_API_KEY", "")
@@ -195,7 +195,75 @@ def test_generate(monkeypatch):
 
     monkeypatch.setattr(config, "GROQ_API_KEY", "gsk_test")
     reply = {"choices": [{"message": {"content": "```latex\n\\begin{tabular}{cc}\n\\end{tabular}\n```"}}]}
-    monkeypatch.setattr(generate.urllib.request, "urlopen", lambda *a, **k: io.BytesIO(json.dumps(reply).encode()))
+    monkeypatch.setattr(model.urllib.request, "urlopen", lambda *a, **k: io.BytesIO(json.dumps(reply).encode()))
     r = client.post("/api/v1/generate", json={"instruction": "a table", "preamble": "\\documentclass{article}"})
     assert r.json() == {"code": "\\begin{tabular}{cc}\n\\end{tabular}"}
     assert client.post("/api/v1/generate", json={"instruction": "x" * 501}).status_code == 400
+
+
+def test_generate_tikz(monkeypatch):
+    import io
+    import json
+    import urllib.error
+
+    from utils import model
+
+    signed_in()
+    monkeypatch.setattr(config, "TIKZ_MODEL_URL", "")
+    assert client.post("/api/v1/generate/tikz", json={"prompt": "a neuron"}).status_code == 503
+
+    monkeypatch.setattr(config, "TIKZ_MODEL_URL", "http://model:8000/v1/chat/completions")
+    monkeypatch.setattr(config, "TIKZ_VARIANTS", 3)
+    replies = iter(["```latex\n\\documentclass[tikz]{standalone}\n```", None, "\\documentclass{standalone}"])
+
+    def fake_urlopen(*a, **k):
+        reply = next(replies)
+        if reply is None:  # one variant fails; the others still come back
+            raise urllib.error.URLError("down")
+        return io.BytesIO(json.dumps({"choices": [{"message": {"content": reply}}]}).encode())
+
+    monkeypatch.setattr(model.urllib.request, "urlopen", fake_urlopen)
+    r = client.post("/api/v1/generate/tikz", json={"prompt": "a neuron"})
+    assert sorted(r.json()["variants"]) == ["\\documentclass[tikz]{standalone}", "\\documentclass{standalone}"]
+
+    monkeypatch.setattr(model.urllib.request, "urlopen", lambda *a, **k: (_ for _ in ()).throw(urllib.error.URLError("down")))
+    assert client.post("/api/v1/generate/tikz", json={"prompt": "a neuron"}).status_code == 502
+    assert client.post("/api/v1/generate/tikz", json={"prompt": ""}).status_code == 400
+
+    sent = []
+
+    def fake_revision(request, **k):
+        sent.append(json.loads(request.data)["messages"])
+        return io.BytesIO(json.dumps({"choices": [{"message": {"content": "\\begin{tikzpicture}B\\end{tikzpicture}"}}]}).encode())
+
+    monkeypatch.setattr(model.urllib.request, "urlopen", fake_revision)
+    revision = {"prompt": "a neuron", "code": "\\begin{tikzpicture}A\\end{tikzpicture}", "change": "thicker lines"}
+    r = client.post("/api/v1/generate/tikz", json=revision)
+    assert r.json() == {"variants": ["\\begin{tikzpicture}B\\end{tikzpicture}"]}
+    assert len(sent) == 1 and sent[0][-2]["content"] == revision["code"] and "thicker lines" in sent[0][-1]["content"]
+    assert client.post("/api/v1/generate/tikz", json={"prompt": "a neuron", "change": "thicker"}).status_code == 400
+
+
+def test_compile_png(monkeypatch):
+    from compiler import service
+
+    signed_in()
+
+    def fake_pdflatex(project_dir, tex_home, main):
+        (project_dir / "Main.pdf").write_bytes(b"%PDF-1.5 fake")
+        return 0
+
+    def fake_png(project_dir, pdf_path):
+        assert pdf_path.name == "Main.pdf"
+        (project_dir / "preview.png").write_bytes(b"\x89PNG fake")
+        return project_dir / "preview.png"
+
+    monkeypatch.setattr(service, "_pdflatex", fake_pdflatex)
+    monkeypatch.setattr(service, "_png", fake_png)
+    r = client.post("/api/v1/compile?format=png", json={"mainFileName": "Main.tex", "files": [MAIN]})
+    assert r.status_code == 200 and r.headers["content-type"] == "image/png" and r.content == b"\x89PNG fake"
+    assert 'filename="Main.png"' in r.headers["content-disposition"]
+
+    r = compile_([MAIN])  # default stays a PDF
+    assert r.headers["content-type"] == "application/pdf" and r.content == b"%PDF-1.5 fake"
+    assert client.post("/api/v1/compile?format=svg", json={"mainFileName": "Main.tex", "files": [MAIN]}).status_code == 400

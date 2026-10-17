@@ -40,6 +40,20 @@ def _pdflatex(project_dir: Path, tex_home: Path, main: str) -> int:
     ).returncode
 
 
+def _png(project_dir: Path, pdf_path: Path) -> Path:
+    """Render page 1 of the PDF as a PNG (for figure previews: a plain image instead of a PDF viewer)."""
+    subprocess.run(
+        ["pdftoppm", "-png", "-r", "220", "-f", "1", "-l", "1", "-singlefile", str(pdf_path), str(project_dir / "preview")],
+        cwd=project_dir,
+        env={"PATH": os.environ.get("PATH", "/usr/bin:/bin")},
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        timeout=config.COMPILE_TIMEOUT_S,
+        check=True,
+    )
+    return project_dir / "preview.png"
+
+
 def _log_tail(path: Path) -> str:
     try:
         with path.open("rb") as f:
@@ -51,8 +65,8 @@ def _log_tail(path: Path) -> str:
     return text if size <= config.MAX_LOG_CHARS else "[log truncated]\n\n" + text
 
 
-def compile_project(project: CompileRequest) -> tuple[str, bytes]:
-    """Return (pdf file name, pdf bytes) or raise AppError."""
+def compile_project(project: CompileRequest, png: bool = False) -> tuple[str, bytes]:
+    """Return (file name, bytes) of the PDF, or of a PNG of its first page when `png`; or raise AppError."""
     if not _slots.acquire(timeout=10):
         raise AppError(503, "COMPILER_BUSY", "The compiler is busy. Try again shortly.")
     try:
@@ -86,6 +100,17 @@ def compile_project(project: CompileRequest) -> tuple[str, bytes]:
                 raise AppError(422, "COMPILE_FAILED", "LaTeX produced no PDF.", log=_log_tail(log_path))
             if pdf_path.stat().st_size > config.MAX_PDF_BYTES:
                 raise AppError(413, "OUTPUT_TOO_LARGE", "The compiled PDF exceeds the output size limit.", log="")
-            return pdf_path.name, pdf_path.read_bytes()
+            if not png:
+                return pdf_path.name, pdf_path.read_bytes()
+
+            try:
+                png_path = _png(project_dir, pdf_path)
+            except FileNotFoundError:
+                raise AppError(503, "COMPILER_UNAVAILABLE", "The preview renderer is unavailable.", log="")
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+                raise AppError(422, "COMPILE_FAILED", "The PDF could not be rendered as an image.", log="")
+            if not png_path.is_file() or png_path.stat().st_size > config.MAX_PDF_BYTES:
+                raise AppError(413, "OUTPUT_TOO_LARGE", "The preview image exceeds the output size limit.", log="")
+            return f"{stem}.png", png_path.read_bytes()
     finally:
         _slots.release()
