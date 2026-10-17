@@ -1,0 +1,50 @@
+services:
+  frontend:
+    build:
+      context: .
+      args:
+        # Production: the public HTTPS URL of the backend, e.g. "https://api.tikz.example.com".
+        NEXT_PUBLIC_BACKEND_URL: "http://localhost:4000"
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 512m
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+    # SUPABASE_URL, SUPABASE_KEY, COOKIE_SECURE (copy .env.example to .env).
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # Production: set to your real frontend origin(s), e.g. "https://tikz.example.com".
+      CORS_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000"
+      # IP of the reverse proxy in front of this container, so rate limiting sees real client IPs.
+      # Only list proxies you control; trusting "*" lets clients spoof their IP.
+      FORWARDED_ALLOW_IPS: "127.0.0.1"
+      COMPILE_TIMEOUT_MS: "20000"
+      MAX_CONCURRENT_COMPILES: "2"
+      RATE_LIMIT_PER_MINUTE: "20"
+    # Bound to localhost only: expose it publicly through a TLS reverse proxy (Caddy/nginx), not directly.
+    ports:
+      - "127.0.0.1:4000:4000"
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 768m
+    cpus: 1.5
+    restart: unless-stopped

@@ -1,0 +1,9 @@
+node_modules
+.next
+.git
+.bin
+backend
+.env*
+.DS_Store
+tsconfig.tsbuildinfo
+*.log
