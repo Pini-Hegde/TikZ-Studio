@@ -12,6 +12,10 @@ create table if not exists public.projects (
   updated_at  timestamptz not null default now()
 );
 
+-- The LaTeX engine the project compiles with. Keep in sync with ENGINES in src/backend/schemas/compiler.py.
+alter table public.projects add column if not exists engine text not null default 'pdflatex'
+  check (engine in ('pdflatex', 'xelatex', 'lualatex'));
+
 create index if not exists projects_user_updated_idx on public.projects (user_id, updated_at desc);
 
 -- Row-level security: every query only ever sees or changes the caller's own rows.
@@ -95,3 +99,36 @@ create trigger on_auth_user_created after insert on auth.users
 insert into public.profiles (id, display_name)
 select id, left(split_part(email, '@', 1), 80) from auth.users
 on conflict (id) do nothing;
+
+-- ─── Figure chats: Figure Studio conversations, one history per user across all projects. ───
+
+create table if not exists public.figure_chats (
+  id          uuid primary key,
+  user_id     uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  -- The project the chat was started in (its preamble shapes the figures). Optional; survives project deletion.
+  project_id  uuid references public.projects (id) on delete set null,
+  title       text not null check (char_length(title) between 1 and 200),
+  -- The conversation: prompts, variant code (including the user's edits) and which variant is shown.
+  turns       jsonb not null default '[]' check (jsonb_typeof(turns) = 'array' and octet_length(turns::text) <= 2000000),
+  -- The variant the user was refining, as {"turn": n, "variant": n}, or null.
+  refining    jsonb,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+create index if not exists figure_chats_user_updated_idx on public.figure_chats (user_id, updated_at desc);
+
+alter table public.figure_chats enable row level security;
+
+drop policy if exists "Users manage their own figure chats" on public.figure_chats;
+create policy "Users manage their own figure chats" on public.figure_chats
+  for all to authenticated
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()));
+
+grant select, insert, update, delete on public.figure_chats to authenticated;
+revoke all on public.figure_chats from anon;
+
+drop trigger if exists figure_chats_touch_updated_at on public.figure_chats;
+create trigger figure_chats_touch_updated_at before update on public.figure_chats
+  for each row execute function public.touch_updated_at();

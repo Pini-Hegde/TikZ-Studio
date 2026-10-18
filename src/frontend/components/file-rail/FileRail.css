@@ -1,0 +1,170 @@
+.file-rail {
+  position: sticky;
+  top: 0;
+  display: flex;
+  height: 100vh;
+  align-self: start;
+  min-height: 0;
+  flex-direction: column;
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.rail-toolbar {
+  display: flex;
+  height: var(--bar-height);
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+/* The logo is the home button: it lifts on hover and replays its story (animations live in Logo.css). */
+.home-logo-button {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  cursor: pointer;
+  filter: drop-shadow(0 4px 8px rgb(var(--shadow-rgb) / 0.22));
+  transition:
+    transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+    filter 0.3s;
+}
+
+.home-logo-button:hover {
+  filter: drop-shadow(0 6px 12px rgb(var(--accent-rgb) / 0.35));
+  transform: translateY(-1px) scale(1.06);
+}
+
+.home-logo-button:active {
+  transform: scale(0.96);
+}
+
+.home-logo-button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-logo-button {
+    transition: none;
+  }
+}
+
+.rail-project-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-strong);
+  font-size: 0.9rem;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .file-rail {
+    position: static;
+    height: auto;
+    flex-direction: row;
+    align-items: stretch;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .rail-toolbar {
+    border-bottom: 0;
+  }
+
+  .rail-project-title {
+    display: none;
+  }
+}
+
+.rail-toggle {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin-left: auto;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    color 0.2s;
+}
+
+.rail-toggle:hover {
+  background: rgb(var(--ink-rgb) / 0.08);
+  color: var(--ink);
+}
+
+.rail-toggle:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.file-rail.collapsed .rail-toolbar {
+  justify-content: center;
+  padding: 0;
+}
+
+.rail-mini {
+  display: grid;
+  flex: 1;
+  align-content: start;
+  justify-items: center;
+  gap: 6px;
+  padding: 12px 0;
+  animation: fade-in 0.3s ease-out both;
+}
+
+.rail-mini .rail-toggle {
+  margin: 0;
+}
+
+.rail-toolbar {
+  position: relative;
+}
+
+.rail-toolbar {
+  border-bottom-color: transparent;
+}
+
+.rail-toolbar::after {
+  position: absolute;
+  right: 14px;
+  left: 14px;
+  height: 2px;
+  background: var(--taper-line);
+  clip-path: var(--taper-shape);
+  content: "";
+  pointer-events: none;
+}
+
+.rail-toolbar::after {
+  bottom: -1px;
+}
+
+/* The narrow collapsed rail gets a shorter line. */
+.file-rail.collapsed .rail-toolbar::after {
+  right: 8px;
+  left: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rail-mini {
+    animation: none;
+  }
+}

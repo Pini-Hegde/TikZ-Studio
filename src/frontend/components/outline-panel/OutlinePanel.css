@@ -1,0 +1,173 @@
+.section-layout {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  border-top: 1px solid var(--line);
+}
+
+summary.panel-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 10px;
+  cursor: pointer;
+  list-style: none;
+}
+
+summary.panel-title::-webkit-details-marker {
+  display: none;
+}
+
+.panel-chevron {
+  transform: rotate(-90deg);
+  transition: transform 0.15s;
+}
+
+.section-layout[open] .panel-chevron {
+  transform: none;
+}
+
+/* The list itself is capped and scrolls: a cap on the <details> doesn't reach its content in every browser. */
+.outline-list {
+  display: flex;
+  max-height: 35vh;
+  flex-direction: column;
+  overflow: auto;
+  padding-bottom: 8px;
+  /* Rows dissolve into the bottom edge while there is more below; the fade clears as the end scrolls into view.
+     Without overflow (or scroll-driven animation support) there is no fade. */
+  mask-image: linear-gradient(to bottom, #000 calc(100% - var(--outline-fade)), transparent);
+  animation: outline-fade linear both;
+  animation-timeline: scroll(self);
+}
+
+@property --outline-fade {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@keyframes outline-fade {
+  0%,
+  85% {
+    --outline-fade: 40px;
+  }
+
+  100% {
+    --outline-fade: 0px;
+  }
+}
+
+.outline-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  border-left: 3px solid transparent;
+  padding-right: 8px;
+}
+
+.outline-row:hover {
+  background: rgb(var(--ink-rgb) / 0.055);
+}
+
+/* Section the cursor is in, same treatment as the open file. */
+.outline-row.active {
+  border-left-color: var(--warm);
+  background: rgb(var(--accent-rgb) / 0.16);
+}
+
+.outline-toggle {
+  display: inline-grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+}
+
+button.outline-toggle:hover {
+  background: rgb(var(--ink-rgb) / 0.1);
+  color: var(--ink);
+}
+
+.outline-toggle svg {
+  transition: transform 0.15s;
+}
+
+.outline-toggle[aria-expanded="false"] svg {
+  transform: rotate(-90deg);
+}
+
+.outline-item {
+  min-width: 0;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 0.84rem;
+  font-weight: 550;
+  letter-spacing: 0;
+  padding: 4px 4px;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.outline-item[data-level="0"],
+.outline-item[data-level="1"],
+.outline-item[data-level="2"] {
+  font-weight: 700;
+}
+
+.outline-row.active .outline-item {
+  color: var(--ink-strong);
+}
+
+.empty-outline {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.35;
+  padding: 4px 12px 10px;
+}
+
+@media (max-width: 760px) {
+  .section-layout {
+    min-width: 160px;
+    border-top: 0;
+    border-left: 1px solid var(--line);
+  }
+
+  .outline-list {
+    max-height: 140px;
+  }
+}
+
+.section-layout {
+  position: relative;
+}
+
+.section-layout {
+  border-top-color: transparent;
+}
+
+.section-layout::before {
+  position: absolute;
+  right: 14px;
+  left: 14px;
+  height: 2px;
+  background: var(--taper-line);
+  clip-path: var(--taper-shape);
+  content: "";
+  pointer-events: none;
+}
+
+.section-layout::before {
+  top: -1px;
+}

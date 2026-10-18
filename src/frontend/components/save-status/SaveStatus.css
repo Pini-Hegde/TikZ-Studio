@@ -1,0 +1,40 @@
+/* Save status: a dot that breathes while saving. */
+.save-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.save-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--sage);
+  box-shadow: 0 0 0 3px rgb(var(--sage-rgb) / 0.18);
+  transition: background 0.3s;
+}
+
+.save-dot.saving {
+  background: var(--warm);
+  box-shadow: 0 0 0 3px rgb(var(--warm-rgb) / 0.2);
+  animation: dot-pulse 1s ease-in-out infinite;
+}
+
+.save-dot.error {
+  background: var(--rose);
+  box-shadow: 0 0 0 3px rgb(var(--rose-rgb) / 0.2);
+}
+
+@keyframes dot-pulse {
+  50% {
+    opacity: 0.4;
+    scale: 0.75;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .save-dot.saving {
+    animation: none;
+  }
+}

@@ -1,0 +1,239 @@
+:root {
+  color-scheme: light;
+  /* Light, "glacier": cool ice-blue paper; --sunken is where you write (fields, editor). Gradients are blended
+     in OKLCH and baked into many stops, so they stay clear (no grey middle) in every browser. Every text colour,
+     including the editor's syntax colours and text on gradients, passes WCAG AA on what it sits on.
+     Source and alternatives: docs/design-explorations/gradients.html. */
+  --page: #eff6f9;
+  --sunken: #fbfdfe;
+  --panel: #f6fbfd;
+  --panel-soft: #e5eef2;
+  --raised: #d9e2e7;
+  --ink: #25363d;
+  --ink-strong: #14252b;
+  --muted: #5b696f;
+  --subtle: #838e94;
+  --accent: #077a9e;
+  --accent-strong: #076482;
+  --accent-ink: #ffffff; /* text on accent fills, readable at every point of --accent-fill */
+  --warm: #ac5c2e;
+  --sage: #417f45;
+  --rose: #bf4b55;
+  --lilac: #6e6ab2;
+  /* Filled accents (primary buttons, active file, selected tabs): one ice hue, light at the top, deep below. */
+  --accent-fill: linear-gradient(180deg, #0f7da1, #06779c, #167194, #106b90, #09668b, #026086, #0e5b7e, #08557a, #025075);
+  --accent-fill-hover: linear-gradient(180deg, #0b7191, #036b8c, #116585, #0a5f81, #035a7c, #0d5474, #074f6f, #024a6b, #074564);
+  /* Vertical, so the 300%-wide login panel looks the same at whichever slice is showing. */
+  --hero: linear-gradient(180deg, #167ca0, #11789c, #0b7398, #046f95, #146a8e, #0f668a, #0a6186, #055d82, #00597f, #0c5478, #075074);
+  --auth-backdrop:
+    radial-gradient(55% 60% at 12% 8%, rgb(55 172 217 / 0.14), transparent 70%),
+    radial-gradient(50% 55% at 92% 95%, rgb(75 168 224 / 0.112), transparent 70%),
+    var(--page);
+  --hero-ink: #ffffff;
+  --hero-em: #b1e9f7;
+  --ink-rgb: 37 54 61;
+  --accent-rgb: 7 122 158;
+  --warm-rgb: 172 92 46;
+  --sage-rgb: 65 127 69;
+  --mauve-rgb: 148 160 221;
+  --rose-rgb: 191 75 85;
+  --page-rgb: 239 246 249;
+  --shadow-rgb: 24 49 63;
+  --line: rgb(var(--ink-rgb) / 0.12);
+  --line-soft: rgb(var(--ink-rgb) / 0.07);
+  --focus: rgb(var(--warm-rgb) / 0.75);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  /* Dark, "glacier at night": deep blue-black, ice light glowing from the accents. */
+  --page: #0f171b;
+  --sunken: #091014;
+  --panel: #171f23;
+  --panel-soft: #1e262a;
+  --raised: #262f33;
+  --ink: #cbdae2;
+  --ink-strong: #d8e7ef;
+  --muted: #95a8b1;
+  --subtle: #6d7d85;
+  --accent: #49a4ca;
+  --accent-strong: #5db7de;
+  --accent-ink: #011923; /* text on accent fills, readable at every point of --accent-fill */
+  --warm: #cc845f;
+  --sage: #73a874;
+  --rose: #dc757a;
+  --lilac: #9897d5;
+  /* Filled accents (primary buttons, active file, selected tabs): one ice hue, light at the top, deep below. */
+  --accent-fill: linear-gradient(180deg, #6ec8ee, #69c1e9, #65bbe4, #61b5df, #5cafda, #58a9d5, #54a4d0, #509ecb, #4c98c6);
+  --accent-fill-hover: linear-gradient(180deg, #7bd5fb, #76cef6, #72c8f1, #6ec2ec, #69bce7, #65b6e2, #61b1dd, #5dabd8, #59a4d3);
+  /* Vertical, so the 300%-wide login panel looks the same at whichever slice is showing. */
+  --hero: linear-gradient(180deg, #086482, #02607e, #0e5b78, #095774, #045371, #0c4e6a, #074a67, #034663, #09425d, #053e59, #023a56);
+  --auth-backdrop:
+    radial-gradient(55% 60% at 12% 8%, rgb(55 172 217 / 0.1), transparent 70%),
+    radial-gradient(50% 55% at 92% 95%, rgb(75 168 224 / 0.080), transparent 70%),
+    var(--page);
+  --hero-ink: #eff7fa;
+  --hero-em: #a2e4f4;
+  --ink-rgb: 203 218 226;
+  --accent-rgb: 73 164 202;
+  --warm-rgb: 204 132 95;
+  --sage-rgb: 115 168 116;
+  --mauve-rgb: 156 167 222;
+  --rose-rgb: 220 117 122;
+  --page-rgb: 15 23 27;
+  --shadow-rgb: 0 3 6;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  background:
+    radial-gradient(circle at 14% 20%, rgb(var(--accent-rgb) / 0.07), transparent 28%),
+    radial-gradient(circle at 85% 70%, rgb(var(--mauve-rgb) / 0.06), transparent 30%),
+    var(--page);
+  color: var(--ink);
+  font-family:
+    "Segoe UI",
+    "Trebuchet MS",
+    system-ui,
+    sans-serif;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  color: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.panel-title {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 0 12px;
+  text-transform: uppercase;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Keyboard keys in hints and tooltips. */
+kbd {
+  display: inline-grid;
+  min-width: 1.6em;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--panel-soft);
+  color: var(--muted);
+  font: 600 0.72rem/1.5 "SFMono-Regular", Consolas, monospace;
+  padding: 0 4px;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    translate: 0 14px;
+    scale: 0.96;
+  }
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    translate: 0 4px;
+    scale: 0.96;
+  }
+}
+
+/* ───────────── Horizontal lines: inset from the edges, tapering to fine points at both ends ───────────── */
+:root {
+  --taper-line: linear-gradient(
+    90deg,
+    rgb(var(--ink-rgb) / 0) 0%,
+    rgb(var(--ink-rgb) / 0.2) 24%,
+    rgb(var(--ink-rgb) / 0.2) 76%,
+    rgb(var(--ink-rgb) / 0) 100%
+  );
+  --taper-shape: polygon(0 50%, 7% 0, 93% 0, 100% 50%, 93% 100%, 7% 100%);
+}
+
+/* A field with no box: a tapered underline like the other horizontal lines, lit in the accent on focus.
+   The editor search, the dashboard search and the engine picker all use it. */
+.underline-field {
+  position: relative;
+}
+
+.underline-field::before,
+.underline-field::after {
+  position: absolute;
+  right: 0;
+  bottom: 6px;
+  left: 0;
+  height: 2px;
+  clip-path: var(--taper-shape);
+  content: "";
+  pointer-events: none;
+}
+
+.underline-field::before {
+  background: var(--taper-line);
+}
+
+.underline-field::after {
+  background: linear-gradient(90deg, rgb(var(--accent-rgb) / 0), var(--accent) 24%, var(--accent) 76%, rgb(var(--accent-rgb) / 0));
+  opacity: 0;
+  scale: 0.4 1;
+  transition:
+    opacity 0.25s ease,
+    scale 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.underline-field:focus-within::after {
+  opacity: 1;
+  scale: 1 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .underline-field::after {
+    transition: none;
+  }
+}

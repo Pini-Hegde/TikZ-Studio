@@ -1,0 +1,100 @@
+.loading-screen {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 44%, rgb(var(--warm-rgb) / 0.13), transparent 22%),
+    radial-gradient(circle at 20% 20%, rgb(var(--accent-rgb) / 0.12), transparent 28%),
+    radial-gradient(circle at 82% 70%, rgb(var(--accent-rgb) / 0.07), transparent 28%),
+    var(--page);
+}
+
+.loading-copy {
+  position: absolute;
+  display: grid;
+  gap: 8px;
+  margin-top: 250px;
+  text-align: center;
+}
+
+.loading-copy h1 {
+  margin: 0;
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  letter-spacing: 0;
+}
+
+.loading-copy p {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 760;
+}
+
+.transition-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 28;
+  display: grid;
+  place-items: center;
+  background: rgb(var(--page-rgb) / 0.72);
+  backdrop-filter: blur(10px);
+}
+
+.transition-copy {
+  margin-top: 228px;
+  animation: opening-card-in 0.28s ease-out both;
+}
+
+@keyframes opening-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.loading-screen.auth-screen {
+  background: var(--auth-backdrop);
+}
+
+/* Loading and page-transition screens: the logo retells its story in a soft glow. */
+.loading-logo {
+  position: relative;
+  display: grid;
+  width: 156px;
+  height: 156px;
+  place-items: center;
+  filter: drop-shadow(0 18px 30px rgb(var(--accent-rgb) / 0.35));
+}
+
+.loading-logo.compact {
+  width: 132px;
+  height: 132px;
+}
+
+.loading-logo::before {
+  position: absolute;
+  inset: 18px;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgb(var(--accent-rgb) / 0.22), transparent);
+  content: "";
+  animation: soft-breathe 2.8s ease-in-out infinite;
+}
+
+@keyframes soft-breathe {
+  50% {
+    opacity: 0.45;
+    transform: scale(1.15);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-logo::before {
+    animation: none;
+  }
+}

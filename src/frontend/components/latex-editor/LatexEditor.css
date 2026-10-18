@@ -1,0 +1,10 @@
+/* CodeMirror mounts here; its own .cm-scroller does the scrolling. */
+.code-editor {
+  height: 100%;
+}
+
+@media (max-width: 760px) {
+  .code-editor .cm-editor {
+    font-size: 0.86rem;
+  }
+}

@@ -1,0 +1,63 @@
+/* Toast: floats over the page instead of pushing it down; errors stay until dismissed. */
+.upload-notice {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  z-index: 60;
+  display: flex;
+  width: max-content;
+  max-width: min(560px, calc(100vw - 32px));
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--sage);
+  border-radius: 12px;
+  background: var(--raised);
+  box-shadow: 0 18px 40px -18px rgb(var(--shadow-rgb) / 0.5);
+  color: var(--ink);
+  font-weight: 650;
+  padding: 10px 10px 10px 16px;
+  translate: -50% 0;
+  animation: toast-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.upload-notice.error {
+  border-left-color: var(--rose);
+}
+
+.upload-notice p {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.upload-notice button {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.upload-notice button:hover {
+  background: var(--panel-soft);
+  color: var(--ink);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    translate: -50% -14px;
+    scale: 0.96;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .upload-notice {
+    animation: none;
+  }
+}

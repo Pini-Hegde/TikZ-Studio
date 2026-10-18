@@ -1,0 +1,365 @@
+/* Overleaf-style tree: flat full-width rows, a filled active row, outline docked below. */
+.file-card {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 0 0 8px;
+}
+
+.panel-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 6px 6px 0;
+  background: var(--panel);
+}
+
+.panel-header .panel-title {
+  flex: 1;
+}
+
+.panel-action {
+  display: inline-grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.panel-action:hover {
+  background: rgb(var(--ink-rgb) / 0.08);
+  color: var(--ink);
+}
+
+.file-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 26px;
+  align-items: center;
+  border-left: 3px solid transparent;
+}
+
+.file-row:hover {
+  background: rgb(var(--ink-rgb) / 0.055);
+}
+
+.file-row.active {
+  border-left-color: var(--warm);
+  background: var(--accent-fill);
+}
+
+.file-link {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  padding: 4px 6px 4px 11px;
+  text-align: left;
+}
+
+/* Icon tint by file type, from the project palette. */
+.file-link svg {
+  color: var(--muted);
+}
+
+.file-row[data-ext="tex"] .file-link svg {
+  color: var(--accent);
+}
+
+.file-row[data-ext="bib"] .file-link svg {
+  color: var(--warm);
+}
+
+.file-row[data-ext="sty"] .file-link svg,
+.file-row[data-ext="cls"] .file-link svg {
+  color: var(--sage);
+}
+
+.file-row.active .file-link,
+.file-row.active .file-link svg,
+.file-row.active .file-menu-trigger {
+  color: var(--accent-ink);
+}
+
+.file-link span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-menu-trigger {
+  display: inline-grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.file-row:hover .file-menu-trigger,
+.file-row.active .file-menu-trigger,
+.file-menu-trigger:focus-visible,
+.file-menu-trigger[aria-expanded="true"] {
+  opacity: 1;
+}
+
+.file-menu-trigger:hover,
+.file-menu-trigger[aria-expanded="true"] {
+  background: rgb(var(--ink-rgb) / 0.12);
+}
+
+.file-row.active .file-menu-trigger:hover,
+.file-row.active .file-menu-trigger[aria-expanded="true"] {
+  background: rgb(255 255 255 / 0.2);
+}
+
+.file-options-menu {
+  position: absolute;
+  top: 100%;
+  right: 4px;
+  z-index: 12;
+  display: grid;
+  width: 132px;
+  gap: 3px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--raised);
+  box-shadow: 0 16px 32px rgb(var(--shadow-rgb) / 0.14);
+  padding: 5px;
+}
+
+.file-options-item {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 0.86rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.file-options-item:hover {
+  background: rgb(var(--ink-rgb) / 0.08);
+}
+
+.file-options-item.danger {
+  color: var(--rose);
+}
+
+.file-rename-input {
+  width: calc(100% - 6px);
+  min-width: 0;
+  height: 28px;
+  margin-left: 6px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: var(--sunken);
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding: 4px 6px;
+}
+
+@media (max-width: 760px) {
+  .file-card {
+    min-width: 200px;
+    max-height: 180px;
+  }
+}
+
+.file-options-menu {
+  transform-origin: top right;
+  animation: menu-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .file-options-menu {
+    animation: none;
+  }
+}
+
+/* ───────────── File tree: folders, depth, guides, type icons ───────────── */
+.ft-root {
+  flex: 1;
+  min-height: 48px;
+  padding-bottom: 10px;
+  transition: background 0.2s;
+}
+
+.ft.drop-root .ft-root {
+  background: rgb(var(--accent-rgb) / 0.06);
+}
+
+.ft-row .file-link {
+  grid-template-columns: 14px 16px minmax(0, 1fr) auto;
+  gap: 6px;
+  padding-left: calc(8px + var(--depth, 0) * 14px);
+}
+
+.ft-chevron {
+  color: var(--subtle);
+  transition: rotate 0.2s ease;
+}
+
+.ft-chevron.open {
+  rotate: 90deg;
+}
+
+.ft-icon {
+  display: inline-grid;
+  place-items: center;
+}
+
+.file-link .ft-icon svg {
+  color: var(--muted);
+}
+
+.ft-icon[data-tone="tex"] svg {
+  color: var(--accent);
+}
+
+.ft-icon[data-tone="bib"] svg {
+  color: var(--warm);
+}
+
+.ft-icon[data-tone="sty"] svg {
+  color: var(--lilac);
+}
+
+.ft-icon[data-tone="tikz"] svg {
+  color: var(--sage);
+}
+
+.ft-icon[data-tone="data"] svg {
+  color: color-mix(in oklch, var(--sage) 55%, var(--accent));
+}
+
+.ft-icon[data-tone="image"] svg {
+  color: var(--rose);
+}
+
+.ft-icon[data-tone="folder"] svg {
+  color: var(--warm);
+}
+
+.file-row.active .ft-icon svg {
+  color: var(--accent-ink);
+}
+
+.ft-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The document Recompile builds. */
+.ft-main {
+  border-radius: 999px;
+  background: rgb(var(--accent-rgb) / 0.14);
+  color: var(--accent);
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 1px 6px;
+  text-transform: uppercase;
+}
+
+.file-row.active .ft-main {
+  background: rgb(255 255 255 / 0.22);
+  color: var(--accent-ink);
+}
+
+.ft-row.folder.focused:not(:hover) {
+  background: rgb(var(--accent-rgb) / 0.07);
+}
+
+.ft-row.drop {
+  background: rgb(var(--accent-rgb) / 0.14);
+  outline: 1px dashed rgb(var(--accent-rgb) / 0.6);
+  outline-offset: -1px;
+}
+
+/* Indent guide: a fine line under each open folder's contents. */
+.ft-group {
+  position: relative;
+  animation: fade-in 0.2s ease-out both;
+}
+
+.ft-group::before {
+  position: absolute;
+  top: 0;
+  bottom: 4px;
+  left: calc(16px + var(--depth, 0) * 14px);
+  width: 1px;
+  background: var(--line);
+  content: "";
+  pointer-events: none;
+}
+
+/* Inline name input for new and renamed files and folders. */
+.ft-draft {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px calc(31px + var(--depth, 0) * 14px);
+}
+
+.ft-draft .file-rename-input {
+  width: 100%;
+  margin: 0;
+}
+
+.ft-draft .file-rename-input[aria-invalid="true"] {
+  border-color: var(--rose);
+}
+
+.ft-error {
+  grid-column: 1 / -1;
+  color: var(--rose);
+  font-size: 0.75rem;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ft-chevron {
+    transition: none;
+  }
+
+  .ft-group {
+    animation: none;
+  }
+}
