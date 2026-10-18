@@ -23,23 +23,17 @@
 
 ```mermaid
 flowchart LR
-    subgraph Browser
-        UI["Next.js frontend<br/>dashboard · editor · PDF preview · Figure Studio"]
-    end
+    U["🖥️ Browser<br/>Next.js app"]
+    B["⚙️ Backend · FastAPI in Docker<br/>auth · projects · compile · generate"]
+    T["📄 LaTeX compiler<br/>latexmk + TeX Live, same container"]
+    S[("🗄️ Supabase<br/>accounts + projects")]
+    M["🤖 AI model<br/>Groq today · our own model next"]
 
-    subgraph Backend["FastAPI backend (Docker, read-only, non-root)"]
-        API["routes/<br/>auth · projects · compile · generate · figure-chats"]
-        SVC["services/compiler<br/>latexmk + TeX Live"]
-    end
-
-    DB[("Supabase<br/>Postgres + Auth<br/>row-level security")]
-    LLM["LLM endpoint<br/>Groq now · own TikZ model next"]
-
-    UI -- "JSON + httpOnly cookies" --> API
-    API --> SVC
-    API -- "user's own token" --> DB
-    API --> LLM
-    SVC -- "PDF / PNG" --> UI
+    U -- "request + session cookie" --> B
+    B -- "PDF · image · JSON" --> U
+    B -- "compile" --> T
+    B -- "read / save as the user" --> S
+    B -- "figure prompt" --> M
 ```
 
 The browser never runs LaTeX and never sees a database key: every request goes through the backend, which talks to Supabase **with the signed-in user's own token**. Postgres row-level security keeps each user to their own rows, even if the backend has a bug.
@@ -47,22 +41,15 @@ The browser never runs LaTeX and never sees a database key: every request goes t
 ## Compiling a project
 
 ```mermaid
-sequenceDiagram
-    participant E as Editor
-    participant B as Backend
-    participant L as latexmk (sandbox)
-    E->>B: POST /api/v1/compile (files, main file, engine)
-    B->>B: validate names, paths, sizes
-    B->>L: run in a fresh temp folder
-    loop until references settle
-        L->>L: pdflatex / xelatex / lualatex
-        L->>L: bibtex / biber (when there is a bibliography)
-    end
-    L-->>B: PDF, or the log
-    B-->>E: PDF  ·  or error + line number → "Go to line 12"
+flowchart LR
+    A["Recompile"] --> B["Backend checks<br/>the files"]
+    B --> C["latexmk in a<br/>temporary folder"]
+    C --> D{"Compiled?"}
+    D -- yes --> E["PDF in the preview"]
+    D -- no --> F["Error with the<br/>line number"]
 ```
 
-Every compile gets a fresh temporary folder that is deleted afterwards. Shell escape is off, project files can't reach server secrets, and a timeout kills the whole process tree.
+latexmk runs the project's engine (pdflatex, xelatex or lualatex) and bibtex/biber as many times as the document needs. The temporary folder is deleted afterwards, shell escape is off, and a compile that runs too long is stopped.
 
 ## Figure Studio
 
