@@ -108,20 +108,8 @@ const initialProjectFiles: ProjectFile[] = [
   },
 ];
 
-// First project for a brand-new account.
-export const createStarterProject = (): ProjectSummary => ({
-  id: crypto.randomUUID(),
-  title: "TikZ Diagram Workspace",
-  owner: "You",
-  lastModified: "Just now by You",
-  tags: ["Diagrams", "Workflow"],
-  isShared: false,
-  isArchived: false,
-  files: initialProjectFiles.map((file) => ({ ...file })),
-});
-
-// What "New project" creates.
-export const createBlankProject = (title: string, tags: string[]): ProjectSummary => ({
+// A project made in this browser (created, uploaded or the starter), not saved yet.
+export const newProject = (title: string, tags: string[], files: ProjectFile[]): ProjectSummary => ({
   id: crypto.randomUUID(),
   title,
   owner: "You",
@@ -129,7 +117,16 @@ export const createBlankProject = (title: string, tags: string[]): ProjectSummar
   tags,
   isShared: false,
   isArchived: false,
-  files: [
+  files,
+});
+
+// First project for a brand-new account.
+export const createStarterProject = () =>
+  newProject("TikZ Diagram Workspace", ["Diagrams", "Workflow"], initialProjectFiles.map((file) => ({ ...file })));
+
+// What "New project" creates.
+export const createBlankProject = (title: string, tags: string[]) =>
+  newProject(title, tags, [
     {
       id: `main-${Date.now()}`,
       name: "Main.tex",
@@ -148,5 +145,4 @@ Start writing your TikZ code here.
       name: "references.bib",
       content: "",
     },
-  ],
-});
+  ]);

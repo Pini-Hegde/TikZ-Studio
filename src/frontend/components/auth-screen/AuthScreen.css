@@ -133,6 +133,45 @@
   pointer-events: none;
 }
 
+/* Overlays the input's text box (its 1px border + padding), so the suffix lines up with the typed text. */
+.auth-email-ghost {
+  position: absolute;
+  inset: 1px 48px 1px 19px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  font-size: 1rem;
+  white-space: pre;
+  pointer-events: none;
+}
+
+.auth-email-ghost > span:first-child {
+  visibility: hidden;
+}
+
+.auth-email-suffix {
+  color: var(--subtle);
+}
+
+.auth-email-badge {
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgb(var(--warm-rgb) / 0.14);
+  color: var(--accent);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  animation: auth-badge-in 0.25s ease-out;
+}
+
+@keyframes auth-badge-in {
+  from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+}
+
 .auth-notice {
   color: var(--accent);
 }
@@ -350,6 +389,10 @@
 
 .auth-intro .auth-input:nth-of-type(2) {
   animation-delay: calc(var(--delay) + var(--type) + 0.35s);
+}
+
+.auth-intro .auth-input:nth-of-type(3) {
+  animation-delay: calc(var(--delay) + var(--type) + 0.4s);
 }
 
 .auth-intro > .auth-btn,

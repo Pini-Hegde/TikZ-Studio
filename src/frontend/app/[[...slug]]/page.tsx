@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { usePathname } from "next/navigation";
+import AppTour from "@/components/app-tour/AppTour";
 import AuthScreen from "@/components/auth-screen/AuthScreen";
 import Dashboard from "@/components/dashboard/Dashboard";
 import EditorPane from "@/components/editor-pane/EditorPane";
@@ -13,13 +15,15 @@ import Notice, { type NoticeMessage } from "@/components/notice/Notice";
 import OutlinePanel from "@/components/outline-panel/OutlinePanel";
 import PreviewPane from "@/components/preview-pane/PreviewPane";
 import ProfileMenu from "@/components/profile-menu/ProfileMenu";
-import { ApiError, apiFetch, apiJson, errorMessage, type User } from "@/lib/api";
+import { ApiError, apiFetch, apiJson, emailName, errorMessage, type User } from "@/lib/api";
 import { compileProject, type CompileOutput } from "@/lib/compile";
 import type { OutlineItem } from "@/lib/latexOutline";
-import { ImportError, MAX_FILE_COUNT, MAX_PROJECT_BYTES, importUploads } from "@/lib/projectImport";
+import { ImportError, MAX_FILE_COUNT, MAX_PROJECT_BYTES, UPLOAD_ACCEPT, importUploads } from "@/lib/projectImport";
+import { withFigureLibraries } from "@/lib/tikzLibraries";
 import {
   createStarterProject,
   fromStoredProject,
+  newProject,
   type DashboardFilter,
   type ProjectFile,
   type ProjectSummary,
@@ -32,6 +36,9 @@ import "./page.css";
 const noopSubscribe = () => () => {};
 const isMacPlatform = () => /Mac|iPhone|iPad/.test(navigator.platform);
 
+// Next.js keeps usePathname in sync with these, without remounting the page.
+const navigate = (path: string, replace = false) => window.history[replace ? "replaceState" : "pushState"](null, "", path);
+
 const waitForTransition = (duration = 450) =>
   new Promise<void>((resolve) => {
     window.setTimeout(resolve, duration);
@@ -39,14 +46,12 @@ const waitForTransition = (duration = 450) =>
 
 export default function Home() {
   const editorRef = useRef<LatexEditorHandle>(null);
-  const [currentView, setCurrentView] = useState<"dashboard" | "editor">("dashboard");
   const [isBooting, setIsBooting] = useState(true);
   const [transitionLabel, setTransitionLabel] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isSessionChecked, setIsSessionChecked] = useState(false);
   const [authError, setAuthError] = useState("");
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
-  const [activeProjectId, setActiveProjectId] = useState("");
   const [activeFileId, setActiveFileId] = useState("");
   const [cursorPosition, setCursorPosition] = useState(0);
   const [uploadNotice, setUploadNotice] = useState<NoticeMessage | null>(null);
@@ -70,7 +75,12 @@ export default function Home() {
   const [dashboardFilter, setDashboardFilter] = useState<DashboardFilter>("all");
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [projectTags, setProjectTags] = useState<string[]>([]);
-  const [isFigureModalOpen, setIsFigureModalOpen] = useState(false);
+  // From the profile's show_tour flag: true until the user finishes or skips the app tour.
+  const [showTour, setShowTour] = useState(false);
+  // profiles.display_name: the name given at sign-up, shown across the app instead of the email.
+  const [displayName, setDisplayName] = useState("");
+  // Kept here, not in the tour: the dashboard and the editor each mount their own copy of it.
+  const [tourStep, setTourStep] = useState(0);
   const lastUserIdRef = useRef<string | null>(null);
   const autosave = useAutosave(projects, Boolean(user), () => setUser(null));
 
@@ -83,10 +93,35 @@ export default function Home() {
     [compileOutput],
   );
 
+  // The URL is the view: /login, /signup, / (dashboard), /project/<id> (editor), /project/<id>/figure (Figure Studio).
+  const pathname = usePathname();
+  const [, section = "", routeId = "", panel = ""] = pathname.split("/");
   const activeProject = useMemo(
-    () => projects.find((project) => project.id === activeProjectId) ?? projects[0],
-    [activeProjectId, projects],
+    () => (section === "project" ? projects.find((project) => project.id === routeId) : undefined),
+    [section, routeId, projects],
   );
+  const activeProjectId = activeProject?.id ?? "";
+  const isFigureOpen = activeProject !== undefined && panel === "figure";
+  const figurePushedRef = useRef(false);
+
+  // Another project opened (click, link, back/forward): start on its first file, without the old PDF.
+  const [shownProjectId, setShownProjectId] = useState("");
+  if (shownProjectId !== activeProjectId) {
+    setShownProjectId(activeProjectId);
+    setActiveFileId(activeProject?.files[0]?.id ?? "");
+    setCompileOutput(null);
+  }
+
+  // Signed-out visitors land on /login (a project link stays put, to open after signing in); signed-in ones skip the
+  // auth pages, and unknown paths or projects that don't exist fall back to the dashboard.
+  const isValidPath = user
+    ? pathname === "/" || (activeProject !== undefined && (panel === "" || panel === "figure"))
+    : pathname === "/login" || pathname === "/signup" || section === "project";
+  useEffect(() => {
+    if (isSessionChecked && !isValidPath) {
+      navigate(user ? "/" : "/login", true);
+    }
+  }, [isSessionChecked, isValidPath, user]);
   const projectFiles = useMemo(() => activeProject?.files ?? [], [activeProject]);
   const activeFile = useMemo(
     () => projectFiles.find((file) => file.id === activeFileId) ?? projectFiles[0],
@@ -106,7 +141,14 @@ export default function Home() {
     });
 
   const loadWorkspace = async (signedInUser: User) => {
-    const { projects: storedProjects } = await apiJson<{ projects: StoredProject[] }>("/api/v1/projects");
+    const [{ projects: storedProjects }, profile] = await Promise.all([
+      apiJson<{ projects: StoredProject[] }>("/api/v1/projects"),
+      // Name and tour flag are niceties: if the profile can't be read, sign-in still works without them.
+      apiJson<{ displayName: string | null; showTour: boolean }>("/api/v1/profile").catch(() => ({
+        displayName: null,
+        showTour: false,
+      })),
+    ]);
     const loadedProjects = storedProjects.map(fromStoredProject);
 
     autosave.markSaved(loadedProjects);
@@ -118,9 +160,9 @@ export default function Home() {
 
     lastUserIdRef.current = signedInUser.id;
     setProjects(loadedProjects);
-    setActiveProjectId(loadedProjects[0].id);
-    setActiveFileId(loadedProjects[0].files[0]?.id ?? "");
     setProjectTags(Array.from(new Set(loadedProjects.flatMap((project) => project.tags))));
+    setShowTour(profile.showTour);
+    setDisplayName(profile.displayName || emailName(signedInUser));
     setUser(signedInUser);
   };
 
@@ -170,12 +212,10 @@ export default function Home() {
     autosave.markSaved([]);
     lastUserIdRef.current = null;
     setProjects([]);
-    setActiveProjectId("");
-    setActiveFileId("");
     setProjectTags([]);
-    setCompileOutput(null);
-    setCurrentView("dashboard");
+    setShowTour(false);
     setUser(null);
+    navigate("/login");
   };
 
   useEffect(() => {
@@ -244,12 +284,7 @@ export default function Home() {
   };
 
   const goToDashboard = () => {
-    void runPageTransition(
-      "Preparing your project dashboard",
-      () => {
-        setCurrentView("dashboard");
-      },
-    );
+    void runPageTransition("Preparing your project dashboard", () => navigate("/"));
   };
 
   const openProject = (projectId: string) => {
@@ -262,26 +297,19 @@ export default function Home() {
     void runPageTransition(
       `Preparing your project ${project.title}`,
       () => {
-        setActiveProjectId(project.id);
-        setActiveFileId(project.files[0]?.id ?? "");
-        setCompileOutput(null);
-        setCurrentView("editor");
-
+        navigate(`/project/${project.id}`);
         window.requestAnimationFrame(() => editorRef.current?.focus());
       },
     );
   };
 
   // A new project (created or uploaded) goes to the top of the list and opens in the editor.
-  const startProject = (newProject: ProjectSummary) => {
-    setProjects((currentProjects) => [newProject, ...currentProjects]);
-    setActiveProjectId(newProject.id);
-    setActiveFileId(newProject.files[0].id);
-    setCompileOutput(null);
+  const startProject = (project: ProjectSummary) => {
+    setProjects((currentProjects) => [project, ...currentProjects]);
     setDashboardFilter("all");
 
-    void runPageTransition(`Preparing your project ${newProject.title}`, () => {
-      setCurrentView("editor");
+    void runPageTransition(`Preparing your project ${project.title}`, () => {
+      navigate(`/project/${project.id}`);
       window.requestAnimationFrame(() => editorRef.current?.focus());
     });
   };
@@ -297,7 +325,7 @@ export default function Home() {
       if (result.files.length === 0) {
         setUploadNotice({
           tone: "error",
-          text: `Nothing to import: no text files found${result.skipped.length ? ` (${result.skipped.length} skipped)` : ""}.`,
+          text: `Nothing to import: no usable files found${result.skipped.length ? ` (${result.skipped.length} skipped)` : ""}.`,
         });
         return null;
       }
@@ -331,16 +359,13 @@ export default function Home() {
     }
 
     const stamp = Date.now();
-    startProject({
-      id: crypto.randomUUID(),
-      title,
-      owner: "You",
-      lastModified: "Just now by You",
-      tags: selectedTag ? [selectedTag] : [],
-      isShared: false,
-      isArchived: false,
-      files: result.files.map((file, index) => ({ id: `file-${stamp}-${index}`, ...file })),
-    });
+    startProject(
+      newProject(
+        title,
+        selectedTag ? [selectedTag] : [],
+        result.files.map((file, index) => ({ id: `file-${stamp}-${index}`, ...file })),
+      ),
+    );
   };
 
   // Upload into the open project: same-name files are replaced, the rest are added.
@@ -374,6 +399,33 @@ export default function Home() {
     if (first) {
       handleSelectFile(first.id);
     }
+  };
+
+  // "Take the tour" from the dashboard or the profile menu: replays it from the start.
+  const startTour = () => {
+    setTourStep(0);
+    setShowTour(true);
+  };
+
+  // Finished or skipped: stored, so the tour doesn't come back. If saving fails it simply shows again next sign-in.
+  const finishTour = () => {
+    setShowTour(false);
+    void apiJson("/api/v1/profile", { method: "PATCH", body: JSON.stringify({ showTour: false }) }).catch(() => undefined);
+  };
+
+  const openFigureStudio = () => {
+    figurePushedRef.current = true;
+    navigate(`/project/${activeProjectId}/figure`);
+  };
+
+  // Go back to the entry Figure Studio was opened from, so Back doesn't reopen it; after a reload there is none.
+  const closeFigureStudio = () => {
+    if (figurePushedRef.current) {
+      window.history.back();
+    } else {
+      navigate(`/project/${activeProjectId}`, true);
+    }
+    figurePushedRef.current = false;
   };
 
   const handleSelectFile = (fileId: string) => {
@@ -499,16 +551,29 @@ export default function Home() {
     const lead = before === "" || before.endsWith("\n") ? "" : "\n";
     const trail = after.startsWith("\n") || after === "" ? (after === "" ? "\n" : "") : "\n";
 
-    updateActiveContent(before + lead + figure + trail + after);
+    // The main document also needs \usepackage{tikz} and the libraries Figure Studio's previews load.
+    const inserted = before + lead + figure + trail + after;
+    const next = mainFile?.id === activeFile.id ? withFigureLibraries(inserted) : inserted;
+    const shift = next.length - inserted.length; // lines added to the preamble, above the figure
+    const otherMain = mainFile && mainFile.id !== activeFile.id ? withFigureLibraries(mainFile.content) : null;
+    updateActiveContent(next);
+    if (otherMain !== null && otherMain !== mainFile?.content) {
+      updateActiveProjectFiles((currentFiles) =>
+        currentFiles.map((file) => (file.id === mainFile?.id ? { ...file, content: otherMain } : file)),
+      );
+    }
+    const addedTikz = shift > 0 || (otherMain !== null && otherMain !== mainFile?.content);
     setUploadNotice({
       tone: "info",
-      text: inPreamble
-        ? `Figure inserted at the end of ${activeFile.name}, before \\end{document} (your cursor was in the preamble).`
-        : `Figure inserted into ${activeFile.name}.`,
+      text:
+        (inPreamble
+          ? `Figure inserted at the end of ${activeFile.name}, before \\end{document} (your cursor was in the preamble).`
+          : `Figure inserted into ${activeFile.name}.`) +
+        (addedTikz ? ` Added \\usepackage{tikz} and the TikZ libraries it needs to the preamble of ${mainFile?.name}.` : ""),
     });
     window.requestAnimationFrame(() => {
       editor.focus();
-      editor.setSelectionRange(start + lead.length, start + lead.length + figure.length);
+      editor.setSelectionRange(start + shift + lead.length, start + shift + lead.length + figure.length);
     });
   };
 
@@ -535,7 +600,7 @@ export default function Home() {
   // sidebar. The dashboard and menus handle their own keys. Re-subscribed each render so it always sees current state.
   useEffect(() => {
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.defaultPrevented || currentView !== "editor") {
+      if (event.defaultPrevented || !activeProject) {
         return;
       }
 
@@ -549,7 +614,7 @@ export default function Home() {
 
       const isCompileKey = mod && (event.key === "Enter" || event.key.toLowerCase() === "s");
 
-      if (user && !isFigureModalOpen && isCompileKey) {
+      if (user && !isFigureOpen && isCompileKey) {
         event.preventDefault();
         void handleRefreshPreview();
       }
@@ -565,20 +630,44 @@ export default function Home() {
   }
 
   if (!user) {
-    return <AuthScreen error={authError} onSignedIn={(signedInUser) => void handleSignedIn(signedInUser)} />;
+    return (
+      <AuthScreen
+        mode={pathname === "/signup" ? "signup" : "login"}
+        onModeChange={(mode) => navigate(`/${mode}`)}
+        error={authError}
+        onSignedIn={(signedInUser) => void handleSignedIn(signedInUser)}
+      />
+    );
   }
 
   const overlays = (
     <>
       {uploadNotice && <Notice notice={uploadNotice} onDismiss={() => setUploadNotice(null)} />}
       {transitionLabel && <TransitionOverlay label={transitionLabel} />}
+      {showTour && (
+        <AppTour
+          view={isFigureOpen ? "figure" : activeProject ? "editor" : "dashboard"}
+          step={tourStep}
+          name={displayName}
+          modKey={modKey}
+          onStepChange={setTourStep}
+          onShowView={(view) => {
+            const project = projects.find((candidate) => !candidate.isArchived) ?? projects[0];
+            if (view === "dashboard") goToDashboard();
+            else if (view === "figure") openFigureStudio();
+            else if (isFigureOpen) closeFigureStudio();
+            else if (project) openProject(project.id);
+          }}
+          onFinish={finishTour}
+        />
+      )}
     </>
   );
 
-  if (currentView === "dashboard") {
+  if (!activeProject) {
     return (
       <Dashboard
-        email={user.email}
+        name={displayName}
         saveState={autosave.saveState}
         projects={projects}
         onProjectsChange={setProjects}
@@ -593,6 +682,7 @@ export default function Home() {
         onOpenProject={openProject}
         onCreateProject={startProject}
         onUploadProject={(input) => void handleUploadProject(input)}
+        onTour={startTour}
         onLogout={() => void handleLogout()}
       >
         {overlays}
@@ -606,7 +696,7 @@ export default function Home() {
       <input
         ref={fileUploadRef}
         type="file"
-        accept=".zip,.tex,.bib,.sty,.cls,.bst,.txt"
+        accept={UPLOAD_ACCEPT}
         multiple
         hidden
         onChange={(event) => void handleUploadFiles(event.currentTarget)}
@@ -620,8 +710,8 @@ export default function Home() {
             onCollapsedChange={setIsRailCollapsed}
             modKey={modKey}
             onHome={goToDashboard}
-            onFigure={() => setIsFigureModalOpen(true)}
-            footer={<ProfileMenu email={user.email} onHome={goToDashboard} onLogout={() => void handleLogout()} />}
+            onFigure={openFigureStudio}
+            footer={<ProfileMenu name={displayName} email={user.email} onHome={goToDashboard} onTour={startTour} onLogout={() => void handleLogout()} />}
           >
             <FileTree
               files={projectFiles}
@@ -637,7 +727,7 @@ export default function Home() {
                 }
               }}
               onUpload={() => fileUploadRef.current?.click()}
-              onFigure={() => setIsFigureModalOpen(true)}
+              onFigure={openFigureStudio}
               onError={(text) => setUploadNotice({ tone: "error", text })}
             />
             <OutlinePanel
@@ -654,6 +744,7 @@ export default function Home() {
           <EditorPane
             editorRef={editorRef}
             docId={activeFile?.id ?? ""}
+            fileName={fileName}
             value={sourceCode}
             cursorPosition={cursorPosition}
             saveState={autosave.saveState}
@@ -690,12 +781,12 @@ export default function Home() {
 
       {/* Stays mounted while closed so the conversation survives; a new project starts a fresh one. */}
       <FigureChat
-        key={activeProject?.id}
-        open={isFigureModalOpen}
+        key={activeProject.id}
+        open={isFigureOpen}
         files={projectFiles.map(({ name, content }) => ({ name, content }))}
         activeFileName={fileName}
         projectId={activeProject?.id}
-        onClose={() => setIsFigureModalOpen(false)}
+        onClose={closeFigureStudio}
         onInsert={insertFigure}
       />
     </main>

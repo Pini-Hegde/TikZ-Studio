@@ -36,7 +36,7 @@
   flex-shrink: 0;
 }
 
-.profile-email {
+.profile-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -135,7 +135,7 @@
   }
 }
 
-.file-rail.collapsed .profile-email {
+.file-rail.collapsed .profile-name {
   display: none;
 }
 

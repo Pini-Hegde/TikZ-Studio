@@ -5,6 +5,9 @@ export type User = {
   email: string | null;
 };
 
+// What profiles.display_name falls back to, as the database trigger does: the email's part before @.
+export const emailName = (user: User) => user.email?.split("@")[0] ?? "";
+
 export class ApiError extends Error {
   constructor(
     public status: number,

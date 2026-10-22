@@ -1,4 +1,6 @@
+import base64
 import os
+import re
 import signal
 import subprocess
 import tempfile
@@ -12,12 +14,22 @@ from utils.errors import AppError
 # Each compile is CPU and memory heavy; cap how many run at once.
 _slots = threading.BoundedSemaphore(config.MAX_CONCURRENT_COMPILES)
 
+# Uploaded images arrive as base64 data URLs (frontend lib/projectImport.ts); everything else is text.
+_DATA_URL = re.compile(r"data:[\w.+-]+/[\w.+-]+;base64,([A-Za-z0-9+/]*={0,2})")
+
 # latexmk's flag for each engine in schemas.compiler.ENGINES.
 _ENGINE_FLAGS = {"pdflatex": "-pdf", "xelatex": "-xelatex", "lualatex": "-lualatex"}
 
+# Error lines in the TeX log (-file-line-error form or "! ...") and in bibtex/biber's .blg.
+_TEX_ERROR = re.compile(r"^(! |\S+?\.tex:\d+: )")
+_BIB_ERROR = re.compile(r"I couldn't open|I found no|^ERROR - ")
 
-def _latexmk(project_dir: Path, tex_home: Path, main: str, engine: str) -> int:
-    """Run the engine, bibtex/biber when the document has a bibliography, and reruns until references settle."""
+
+def _latexmk(project_dir: Path, tex_home: Path, main: str, engine: str, strict: bool) -> int:
+    """Run the engine, bibtex/biber when the document has a bibliography, and reruns until references settle.
+
+    Not `strict` is Overleaf's "try to compile despite errors": keep going past errors so the PDF still gets made.
+    """
     with (tex_home / "latexmk.out").open("wb") as out:
         proc = subprocess.Popen(
             [
@@ -26,7 +38,7 @@ def _latexmk(project_dir: Path, tex_home: Path, main: str, engine: str) -> int:
                 "-silent",  # its own messages only (e.g. "bib file not found"), not the engine's chatter
                 _ENGINE_FLAGS[engine],
                 "-interaction=nonstopmode",
-                "-halt-on-error",
+                *(["-halt-on-error"] if strict else ["-f"]),
                 "-file-line-error",
                 "-no-shell-escape",
                 main,
@@ -89,8 +101,24 @@ def _full_log(log_path: Path, tex_home: Path) -> str:
     return log
 
 
-def compile_project(project: CompileRequest, png: bool = False) -> tuple[str, bytes]:
-    """Return (file name, bytes) of the PDF, or of a PNG of its first page when `png`; or raise AppError."""
+def _errors(log_path: Path) -> str:
+    """Just the errors from the TeX and bibliography logs (a few lines each), for a PDF made despite them."""
+    found = []
+    for path, pattern, context in ((log_path, _TEX_ERROR, 3), (log_path.with_suffix(".blg"), _BIB_ERROR, 2)):
+        try:
+            lines = path.read_text("utf-8", "replace").splitlines()
+        except FileNotFoundError:
+            continue
+        found += ["\n".join(lines[i : i + 1 + context]) for i, line in enumerate(lines) if pattern.search(line)]
+    # Sent as a response header: kept small so proxies with 4-8 KB header buffers pass it.
+    return "\n\n".join(found)[:2000] or "LaTeX reported an error. Check the full log."
+
+
+def compile_project(project: CompileRequest, png: bool = False) -> tuple[str, bytes, str]:
+    """Return (file name, bytes, errors) of the PDF, or of a PNG of its first page when `png`; or raise AppError.
+
+    `errors` is empty for a clean compile; otherwise the PDF was made despite them (PNG previews must compile cleanly).
+    """
     if not _slots.acquire(timeout=10):
         raise AppError(503, "COMPILER_BUSY", "The compiler is busy. Try again shortly.")
     try:
@@ -104,27 +132,31 @@ def compile_project(project: CompileRequest, png: bool = False) -> tuple[str, by
                 for f in project.files:
                     path = project_dir / f.name
                     path.parent.mkdir(parents=True, exist_ok=True)
-                    path.write_text(f.content, encoding="utf-8")
+                    if image := _DATA_URL.fullmatch(f.content):
+                        path.write_bytes(base64.b64decode(image[1]))
+                    else:
+                        path.write_text(f.content, encoding="utf-8")
             except (FileExistsError, NotADirectoryError, IsADirectoryError):
                 raise AppError(400, "INVALID_REQUEST", "A file name conflicts with a folder name.")
 
             stem = Path(project.mainFileName).stem
             log_path = project_dir / f"{stem}.log"
+            pdf_path = project_dir / f"{stem}.pdf"
             try:
-                if _latexmk(project_dir, tex_home, project.mainFileName, project.engine) != 0:
+                code = _latexmk(project_dir, tex_home, project.mainFileName, project.engine, strict=png)
+                if code != 0 and (png or not pdf_path.is_file()):
                     raise AppError(422, "COMPILE_FAILED", "LaTeX compilation failed.", log=_full_log(log_path, tex_home))
             except FileNotFoundError:
                 raise AppError(503, "COMPILER_UNAVAILABLE", "The LaTeX compiler is unavailable.", log="")
             except subprocess.TimeoutExpired:
                 raise AppError(408, "COMPILE_TIMEOUT", "LaTeX compilation exceeded the time limit.", log=_full_log(log_path, tex_home))
 
-            pdf_path = project_dir / f"{stem}.pdf"
             if not pdf_path.is_file():
                 raise AppError(422, "COMPILE_FAILED", "LaTeX produced no PDF.", log=_log_tail(log_path))
             if pdf_path.stat().st_size > config.MAX_PDF_BYTES:
                 raise AppError(413, "OUTPUT_TOO_LARGE", "The compiled PDF exceeds the output size limit.", log="")
             if not png:
-                return pdf_path.name, pdf_path.read_bytes()
+                return pdf_path.name, pdf_path.read_bytes(), _errors(log_path) if code else ""
 
             try:
                 png_path = _png(project_dir, pdf_path)
@@ -134,6 +166,6 @@ def compile_project(project: CompileRequest, png: bool = False) -> tuple[str, by
                 raise AppError(422, "COMPILE_FAILED", "The PDF could not be rendered as an image.", log="")
             if not png_path.is_file() or png_path.stat().st_size > config.MAX_PDF_BYTES:
                 raise AppError(413, "OUTPUT_TOO_LARGE", "The preview image exceeds the output size limit.", log="")
-            return f"{stem}.png", png_path.read_bytes()
+            return f"{stem}.png", png_path.read_bytes(), ""
     finally:
         _slots.release()

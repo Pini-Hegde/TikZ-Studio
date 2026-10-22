@@ -3,6 +3,7 @@ import { Archive, ArchiveRestore, Copy, Download, FileText, Plus, Search, Tag, T
 import Logo from "@/components/logo/Logo";
 import SaveStatus from "@/components/save-status/SaveStatus";
 import ThemeToggle from "@/components/theme-toggle/ThemeToggle";
+import { UPLOAD_ACCEPT } from "@/lib/projectImport";
 import { createBlankProject, sanitizeFileName, type DashboardFilter, type ProjectSummary } from "@/lib/projects";
 import type { SaveState } from "@/lib/useAutosave";
 import { createProjectZip, downloadBlob } from "@/lib/zip";
@@ -12,7 +13,7 @@ import "./Dashboard.css";
 type Props = {
   // Toasts and the page-transition overlay, drawn over the dashboard.
   children?: ReactNode;
-  email: string | null;
+  name: string;
   saveState: SaveState;
   projects: ProjectSummary[];
   onProjectsChange: Dispatch<SetStateAction<ProjectSummary[]>>;
@@ -28,6 +29,7 @@ type Props = {
   onOpenProject: (projectId: string) => void;
   onCreateProject: (project: ProjectSummary) => void;
   onUploadProject: (input: HTMLInputElement) => void;
+  onTour: () => void;
   onLogout: () => void;
 };
 
@@ -38,9 +40,14 @@ const filterLabels: Record<DashboardFilter, string> = {
   archived: "Archived projects",
 };
 
+const inFilter = (project: ProjectSummary, filter: DashboardFilter) =>
+  filter === "archived"
+    ? project.isArchived
+    : !project.isArchived && (filter === "all" || (filter === "yours" ? project.owner === "You" : project.isShared));
+
 export default function Dashboard({
   children,
-  email,
+  name,
   saveState,
   projects,
   onProjectsChange: setProjects,
@@ -55,6 +62,7 @@ export default function Dashboard({
   onOpenProject,
   onCreateProject,
   onUploadProject,
+  onTour,
   onLogout,
 }: Props) {
   const projectUploadRef = useRef<HTMLInputElement>(null);
@@ -67,37 +75,12 @@ export default function Dashboard({
   const [newTagWarning, setNewTagWarning] = useState("");
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
 
-  const dashboardCounts = useMemo(
-    () => ({
-      all: projects.filter((project) => !project.isArchived).length,
-      yours: projects.filter((project) => project.owner === "You" && !project.isArchived).length,
-      shared: projects.filter((project) => project.isShared && !project.isArchived).length,
-      archived: projects.filter((project) => project.isArchived).length,
-    }),
-    [projects],
-  );
   const dashboardTitle = selectedTag ? `Tagged: ${selectedTag}` : filterLabels[dashboardFilter];
   const filteredProjects = useMemo(() => {
     const query = projectSearchQuery.trim().toLowerCase();
-    const baseProjects = projects.filter((project) => {
-      if (selectedTag) {
-        return !project.isArchived && project.tags.includes(selectedTag);
-      }
-
-      if (dashboardFilter === "yours") {
-        return project.owner === "You" && !project.isArchived;
-      }
-
-      if (dashboardFilter === "shared") {
-        return project.isShared && !project.isArchived;
-      }
-
-      if (dashboardFilter === "archived") {
-        return project.isArchived;
-      }
-
-      return !project.isArchived;
-    });
+    const baseProjects = projects.filter((project) =>
+      selectedTag ? !project.isArchived && project.tags.includes(selectedTag) : inFilter(project, dashboardFilter),
+    );
 
     if (!query) {
       return baseProjects;
@@ -319,7 +302,7 @@ export default function Dashboard({
           <input
             ref={projectUploadRef}
             type="file"
-            accept=".zip,.tex,.bib,.sty,.cls,.bst,.txt"
+            accept={UPLOAD_ACCEPT}
             multiple
             hidden
             onChange={(event) => onUploadProject(event.currentTarget)}
@@ -339,7 +322,7 @@ export default function Dashboard({
               onClick={() => selectDashboardFilter(filterName)}
             >
               <span>{filterLabels[filterName]}</span>
-              <strong>{dashboardCounts[filterName]}</strong>
+              <strong>{projects.filter((project) => inFilter(project, filterName)).length}</strong>
             </button>
           ))}
         </nav>
@@ -383,9 +366,12 @@ export default function Dashboard({
           <h1>{dashboardTitle}</h1>
           <div className="plan-pill">
             <SaveStatus state={saveState}>
-              <strong>{email}</strong> ·{" "}
+              <strong>{name}</strong> ·{" "}
             </SaveStatus>
             <ThemeToggle />
+            <button type="button" onClick={onTour}>
+              Take the tour
+            </button>
             <button type="button" onClick={onLogout}>
               Sign out
             </button>

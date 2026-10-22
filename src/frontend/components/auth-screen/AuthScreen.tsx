@@ -1,11 +1,13 @@
 import { useState, type CSSProperties } from "react";
-import { Lock, Mail } from "lucide-react";
+import { Lock, Mail, UserRound } from "lucide-react";
 import ThemeToggle from "@/components/theme-toggle/ThemeToggle";
 import Logo from "@/components/logo/Logo";
 import { apiJson, errorMessage, type User } from "@/lib/api";
 import "./AuthScreen.css";
 
 type AuthScreenProps = {
+  mode: Mode; // from the URL: /login or /signup
+  onModeChange: (mode: Mode) => void;
   error: string;
   onSignedIn: (user: User) => void;
 };
@@ -16,6 +18,10 @@ const ENVIRONMENT: Record<Mode, string> = {
   login: "session",
   signup: "account",
 };
+
+// A bare name is a Gmail address: "ada" signs in as ada@gmail.com. Anything with an @ is used as typed.
+const GMAIL = "@gmail.com";
+const fullEmail = (value: string) => (value.trim() && !value.includes("@") ? `${value.trim()}${GMAIL}` : value.trim());
 
 // Typed code first, then the heading "compiles" in. The delay waits for the panel slide after a switch.
 function introStyle(code: string, delay: number): CSSProperties {
@@ -60,8 +66,8 @@ function Sketch({ from, to }: { from: string; to: string }) {
   );
 }
 
-export default function AuthScreen({ error, onSignedIn }: AuthScreenProps) {
-  const [mode, setMode] = useState<Mode>("login");
+export default function AuthScreen({ mode, onModeChange, error, onSignedIn }: AuthScreenProps) {
+  const [name, setName] = useState(""); // sign-up only: shown across the app instead of the email
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [warning, setWarning] = useState("");
@@ -71,7 +77,7 @@ export default function AuthScreen({ error, onSignedIn }: AuthScreenProps) {
   const isSignup = mode === "signup";
 
   const switchTo = (next: Mode) => {
-    setMode(next);
+    onModeChange(next);
     setHasSwitched(true);
     setWarning("");
     setNotice("");
@@ -87,14 +93,14 @@ export default function AuthScreen({ error, onSignedIn }: AuthScreenProps) {
         `/api/v1/auth/${mode}`,
         {
           method: "POST",
-          body: JSON.stringify({ email, password }),
+          body: JSON.stringify({ email: fullEmail(email), password, ...(mode === "signup" && { name }) }),
         },
       );
 
       if (result.user) {
         onSignedIn(result.user);
       } else {
-        setMode("login");
+        onModeChange("login");
         setNotice("Check your email to confirm your account, then sign in.");
       }
     } catch (submitError) {
@@ -135,19 +141,54 @@ export default function AuthScreen({ error, onSignedIn }: AuthScreenProps) {
             <em>{isLogin ? "Studio" : "account"}</em>
           </h1>
 
+          {!isLogin && (
+            <label className="auth-input">
+              <span className="sr-only">Your name</span>
+              <span className="auth-field">
+                <input
+                  autoFocus={isActive}
+                  required
+                  type="text"
+                  placeholder="Your name"
+                  autoComplete="name"
+                  maxLength={80}
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                />
+                <UserRound aria-hidden size={17} />
+              </span>
+            </label>
+          )}
+
           <label className="auth-input">
             <span className="sr-only">Email</span>
             <span className="auth-field">
+              {/* Text, not type="email": the browser would reject a bare name before @gmail.com is added. */}
               <input
-                autoFocus={isActive}
+                autoFocus={isActive && isLogin}
                 required
-                type="email"
-                placeholder="Email"
+                type="text"
+                inputMode="email"
+                autoCapitalize="none"
+                spellCheck={false}
+                placeholder="Email or Gmail username"
                 autoComplete="email"
+                aria-describedby={`${formMode}-email-hint`}
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
               />
+              {/* The suffix that will be added, drawn right after what is typed (the hidden copy sets its position). */}
+              {email.trim() && !email.includes("@") && (
+                <span className="auth-email-ghost" aria-hidden>
+                  <span>{email}</span>
+                  <span className="auth-email-suffix">{GMAIL}</span>
+                  <span className="auth-email-badge">auto</span>
+                </span>
+              )}
               <Mail aria-hidden size={17} />
+            </span>
+            <span className="sr-only" id={`${formMode}-email-hint`}>
+              Without an @, {GMAIL} is added for you.
             </span>
           </label>
 

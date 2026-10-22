@@ -22,7 +22,8 @@ TIKZ_SYSTEM_PROMPT = (
     "You draw scientific figures in TikZ. Reply with only one \\begin{tikzpicture}...\\end{tikzpicture} block, "
     "to be pasted into the body of an existing document: no \\documentclass, no \\usepackage, no \\usetikzlibrary, "
     "no \\begin{document}, no explanations, no markdown fences. Only use packages and TikZ libraries loaded in the "
-    "given preamble; if one is missing, use an alternative that works without it."
+    "given preamble; if one is missing, use an alternative that works without it. Every line meant to be seen must "
+    "be drawn: \\path draws nothing unless its options or style include draw."
 )
 
 

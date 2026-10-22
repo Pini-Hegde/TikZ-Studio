@@ -2,12 +2,14 @@ import { useMemo, useState, type RefObject } from "react";
 import { Bold, ChevronDown, ChevronUp, Italic, Search, Type, Underline } from "lucide-react";
 import LatexEditor, { type FormatCommand, type LatexEditorHandle } from "@/components/latex-editor/LatexEditor";
 import SaveStatus from "@/components/save-status/SaveStatus";
+import { isDataUrl } from "@/lib/projectImport";
 import type { SaveState } from "@/lib/useAutosave";
 import "./EditorPane.css";
 
 type Props = {
   editorRef: RefObject<LatexEditorHandle | null>;
   docId: string;
+  fileName: string;
   value: string;
   cursorPosition: number;
   saveState: SaveState;
@@ -22,6 +24,7 @@ type Props = {
 export default function EditorPane({
   editorRef,
   docId,
+  fileName,
   value,
   cursorPosition,
   saveState,
@@ -199,18 +202,26 @@ export default function EditorPane({
         </div>
       </div>
 
-      <div className="code-surface">
-        <LatexEditor
-          ref={editorRef}
-          docId={docId}
-          value={value}
-          onChange={onChange}
-          onCursor={onCursor}
-          onFormat={onFormat}
-          onGenerateError={onGenerateError}
-          onCompile={onCompile}
-        />
-      </div>
+      {/* Uploaded images are data URLs: show the picture, never the base64 in an editor that could corrupt it. */}
+      {value.startsWith("data:") && isDataUrl(value) ? (
+        <div className="code-surface image-surface">
+          {value.startsWith("data:image/") ? <img src={value} alt={fileName} /> : <p>{fileName}</p>}
+          <code>{`\\includegraphics{${fileName}}`}</code>
+        </div>
+      ) : (
+        <div className="code-surface">
+          <LatexEditor
+            ref={editorRef}
+            docId={docId}
+            value={value}
+            onChange={onChange}
+            onCursor={onCursor}
+            onFormat={onFormat}
+            onGenerateError={onGenerateError}
+            onCompile={onCompile}
+          />
+        </div>
+      )}
       <div className="editor-status" aria-label="Editor status">
         <span>
           Ln {cursorLine}, Col {cursorColumn}

@@ -21,7 +21,9 @@ import {
   WandSparkles,
   X,
 } from "lucide-react";
-import { ApiError, apiFetch, apiJson, errorMessage } from "@/lib/api";
+import { apiFetch, apiJson, errorMessage } from "@/lib/api";
+import { firstTexError } from "@/lib/compile";
+import { figureLines } from "@/lib/tikzLibraries";
 import Logo from "@/components/logo/Logo";
 import "./FigureChat.css";
 
@@ -55,10 +57,7 @@ type ChatSummary = { id: string; title: string; projectId: string | null; update
 type StoredTurn = { request: string; prompt: string; isRevision: boolean; variants: { code: string }[]; active: number; error: string | null };
 type StoredChat = ChatSummary & { turns: StoredTurn[]; refining: { turn: number; variant: number } | null };
 
-const newChatId = () =>
-  typeof crypto.randomUUID === "function"
-    ? crypto.randomUUID()
-    : "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) => (Number(c) ^ (Math.random() * 16) >> (Number(c) / 4)).toString(16));
+const newChatId = () => crypto.randomUUID();
 
 // Today / Yesterday / Previous 7 days / Older, like other chat apps.
 const dayGroup = (iso: string) => {
@@ -80,11 +79,13 @@ const SUGGESTIONS = [
   "A free-body diagram of a block on an inclined plane with friction",
 ];
 
-// The preamble of the project's main document: the model may only use what it loads, so approved code compiles in place.
+// The preamble of the project's main document plus TikZ and the figure libraries (Insert adds those to the project
+// too): the model may only use what it loads, so approved code compiles in place.
 const projectPreamble = (files: ProjectFile[], activeFileName: string) => {
   const ordered = [...files].sort((a, b) => Number(b.name === activeFileName) - Number(a.name === activeFileName));
   const main = ordered.find((file) => file.content.includes("\\begin{document}"));
-  return main ? main.content.slice(0, main.content.indexOf("\\begin{document}")) : "";
+  const preamble = main ? main.content.slice(0, main.content.indexOf("\\begin{document}")) : "";
+  return preamble + figureLines(preamble);
 };
 
 const statusOf = (variant: Variant) =>
@@ -148,6 +149,7 @@ export default function FigureChat({ open, files, activeFileName, projectId, onC
   // Open beside the chat on wide screens; on phones it would cover the conversation, so it starts closed.
   const [isHistoryOpen, setIsHistoryOpen] = useState(() => typeof window === "undefined" || window.matchMedia("(min-width: 721px)").matches);
   const [renaming, setRenaming] = useState<{ id: string; value: string } | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<ChatSummary | null>(null); // the chat whose delete awaits confirmation
   const lastSaved = useRef(""); // the serialized chat as last saved, so unchanged chats aren't re-saved
   const [draft, setDraft] = useState("");
   // The variant a message refines; null = the message describes a new figure.
@@ -234,12 +236,8 @@ export default function FigureChat({ open, files, activeFileName, projectId, onC
   useEffect(() => {
     if (!serialized || serialized === lastSaved.current || isBusy) return;
     const timer = window.setTimeout(() => {
-      apiFetch(`/api/v1/figure-chats/${chatId}`, { method: "PUT", body: serialized })
-        .then(async (response) => {
-          if (!response.ok) {
-            const body = await response.json().catch(() => null);
-            throw new ApiError(response.status, body?.error?.message ?? "The chat could not be saved.");
-          }
+      apiJson(`/api/v1/figure-chats/${chatId}`, { method: "PUT", body: serialized })
+        .then(() => {
           lastSaved.current = serialized;
           setHistoryNote("");
           const summary = { id: chatId, title: JSON.parse(serialized).title, projectId: chatProjectId ?? null, updatedAt: new Date().toISOString() };
@@ -304,7 +302,7 @@ export default function FigureChat({ open, files, activeFileName, projectId, onC
   };
 
   const deleteChat = async (chat: ChatSummary) => {
-    if (!window.confirm(`Delete the chat "${chat.title}"? This can't be undone.`)) return;
+    setPendingDelete(null);
     try {
       await apiJson(`/api/v1/figure-chats/${chat.id}`, { method: "DELETE" });
       setChats((list) => (list ?? []).filter((item) => item.id !== chat.id));
@@ -377,15 +375,8 @@ export default function FigureChat({ open, files, activeFileName, projectId, onC
       });
       if (!response.ok) {
         const body = await response.json().catch(() => null);
-        // The first error line of the TeX log names the actual mistake: "! ..." or, with -file-line-error,
-        // "./file.tex:12: ...". The file and line refer to the preview wrapper, so they are dropped.
-        const errorLine = /^(?:!|\S+\.tex:\d+: )/;
-        const lines = ((body?.error?.log as string | undefined) ?? "").split("\n");
-        let at = lines.findIndex((line) => errorLine.test(line));
-        let texError = at === -1 ? "" : lines[at];
-        // TeX hard-wraps its log at 79 characters, so a long message continues on the next lines.
-        while (at !== -1 && lines[at].length === 79 && at + 1 < lines.length) texError += lines[++at];
-        texError = texError.replace(errorLine, "").trim();
+        // The first error in the TeX log names the actual mistake; its file and line refer to the preview wrapper.
+        const texError = firstTexError(body?.error?.log ?? "")?.message;
         return { error: texError || body?.error?.message || `Compile failed (${response.status}).` };
       }
       return { imageUrl: URL.createObjectURL(await response.blob()) };
@@ -459,6 +450,43 @@ export default function FigureChat({ open, files, activeFileName, projectId, onC
         }}
       >
         <div className="fs-aurora" aria-hidden="true" />
+
+        {pendingDelete && (
+          <div className="fs-confirm-backdrop" onMouseDown={(event) => event.target === event.currentTarget && setPendingDelete(null)}>
+            <div
+              className="fs-confirm"
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="fs-confirm-title"
+              aria-describedby="fs-confirm-text"
+              tabIndex={-1} // a click on the card keeps focus inside it, so Escape still reaches onKeyDown
+              onKeyDown={(event) => {
+                // Escape cancels the delete only, not Figure Studio behind it.
+                if (event.key === "Escape") {
+                  event.stopPropagation();
+                  setPendingDelete(null);
+                }
+              }}
+            >
+              <span className="fs-confirm-icon" aria-hidden="true">
+                <Trash2 size={18} />
+              </span>
+              <h3 id="fs-confirm-title">Delete this chat?</h3>
+              <p id="fs-confirm-text">
+                <strong>{pendingDelete.title}</strong> and its figures will be gone for good. Figures already inserted
+                into your project stay there.
+              </p>
+              <div className="fs-confirm-actions">
+                <button type="button" autoFocus onClick={() => setPendingDelete(null)}>
+                  Cancel
+                </button>
+                <button type="button" className="danger" onClick={() => void deleteChat(pendingDelete)}>
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <header className="fs-header">
           {/* Mounted only while open, so the logo plays its story each time Figure Studio opens. */}
@@ -540,7 +568,7 @@ export default function FigureChat({ open, files, activeFileName, projectId, onC
                         <button type="button" className="fs-history-action" aria-label={`Rename ${chat.title}`} onClick={() => setRenaming({ id: chat.id, value: chat.id === chatId ? title : chat.title })}>
                           <Pencil size={13} />
                         </button>
-                        <button type="button" className="fs-history-action danger" aria-label={`Delete ${chat.title}`} onClick={() => void deleteChat(chat)}>
+                        <button type="button" className="fs-history-action danger" aria-label={`Delete ${chat.title}`} onClick={() => setPendingDelete(chat)}>
                           <Trash2 size={13} />
                         </button>
                       </div>

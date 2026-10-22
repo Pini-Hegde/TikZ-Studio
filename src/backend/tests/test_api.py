@@ -72,7 +72,7 @@ def test_login_sets_httponly_cookies(fresh_state):
     _, replies = fresh_state
     replies["/auth/v1/token"] = (200, SESSION)
     r = client.post("/api/v1/auth/login", json={"email": "a@b.co", "password": "password123"})
-    assert r.status_code == 200 and r.json()["user"]["email"] == "a@b.co"
+    assert r.status_code == 200 and r.json()["user"] == {"id": "u1", "email": "a@b.co"}  # the name comes from the profile
     cookies = r.headers.get_list("set-cookie")
     assert any(c.startswith("tikz_access=acc") and "HttpOnly" in c and "Path=/api" in c for c in cookies)
     assert any(c.startswith("tikz_refresh=ref") and "Path=/api/v1/auth" in c for c in cookies)
@@ -84,7 +84,8 @@ def test_login_failure_and_weak_password(fresh_state):
     replies["/auth/v1/token"] = (400, {"msg": "Invalid login credentials"})
     r = client.post("/api/v1/auth/login", json={"email": "a@b.co", "password": "password123"})
     assert r.status_code == 401 and r.json()["error"]["message"] == "Invalid login credentials"
-    assert client.post("/api/v1/auth/signup", json={"email": "a@b.co", "password": "short"}).status_code == 400
+    assert client.post("/api/v1/auth/signup", json={"email": "a@b.co", "password": "short", "name": "Ada"}).status_code == 400
+    assert client.post("/api/v1/auth/signup", json={"email": "a@b.co", "password": "password123", "name": " "}).status_code == 400
 
 
 def test_failed_refresh_clears_cookies(fresh_state):
@@ -168,10 +169,16 @@ def test_rate_limit_buckets():
 def test_signup_confirmation_uses_pkce(fresh_state):
     import base64, hashlib  # noqa: E401
     calls, replies = fresh_state
-    replies["/auth/v1/signup"] = (200, {"id": "u1", "email": "a@b.co"})  # confirmation required: no session yet
-    r = client.post("/api/v1/auth/signup", json={"email": "a@b.co", "password": "password123"})
+    # An email that already has an account: Supabase answers with a user without identities and sends nothing.
+    replies["/auth/v1/signup"] = (200, {"id": "u0", "email": "a@b.co", "identities": []})
+    r = client.post("/api/v1/auth/signup", json={"email": "a@b.co", "password": "password123", "name": "Ada"})
+    assert r.status_code == 409 and r.json()["error"]["code"] == "EMAIL_TAKEN" and "tikz_pkce" not in client.cookies
+
+    replies["/auth/v1/signup"] = (200, {"id": "u1", "email": "a@b.co", "identities": [{"provider": "email"}]})  # no session yet
+    r = client.post("/api/v1/auth/signup", json={"email": "a@b.co", "password": "password123", "name": " Ada Lovelace "})
     assert r.json() == {"user": None, "confirmEmail": True}
     _, path, kwargs = calls[-1]
+    assert kwargs["body"]["data"] == {"display_name": "Ada Lovelace"} and "name" not in kwargs["body"]
     assert "redirect_to=http%3A%2F%2Ftestserver%2Fapi%2Fv1%2Fauth%2Fcallback" in path
     verifier = client.cookies.get("tikz_pkce")
     challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
@@ -252,14 +259,23 @@ def test_generate_tikz(monkeypatch):
 
 
 def test_compile_png(monkeypatch):
+    import urllib.parse
+
     from services import compiler as service
 
     signed_in()
 
     engines = []
 
-    def fake_latexmk(project_dir, tex_home, main, engine):
+    def fake_latexmk(project_dir, tex_home, main, engine, strict):
         engines.append(engine)
+        if "\\undefined" in (project_dir / "Main.tex").read_text():  # an error, but a PDF anyway (Overleaf-style)
+            (project_dir / "Main.pdf").write_bytes(b"%PDF-1.5 fake")
+            (project_dir / "Main.log").write_text("./Main.tex:3: Undefined control sequence.\nl.3 \\undefined\n")
+            (project_dir / "Main.blg").write_text("I couldn't open style file x.bst\n")
+            return 12
+        if (project_dir / "fig.png").exists():  # uploaded images reach the compiler as bytes
+            assert (project_dir / "fig.png").read_bytes() == b"\x89PNG"
         (project_dir / "Main.pdf").write_bytes(b"%PDF-1.5 fake")
         return 0
 
@@ -274,7 +290,7 @@ def test_compile_png(monkeypatch):
     assert r.status_code == 200 and r.headers["content-type"] == "image/png" and r.content == b"\x89PNG fake"
     assert 'filename="Main.png"' in r.headers["content-disposition"]
 
-    r = compile_([MAIN])  # default stays a PDF
+    r = compile_([MAIN, {"name": "fig.png", "content": "data:image/png;base64,iVBORw=="}])  # default stays a PDF
     assert r.headers["content-type"] == "application/pdf" and r.content == b"%PDF-1.5 fake"
     assert client.post("/api/v1/compile?format=svg", json={"mainFileName": "Main.tex", "files": [MAIN]}).status_code == 400
 
@@ -284,9 +300,20 @@ def test_compile_png(monkeypatch):
     assert engines == ["pdflatex", "pdflatex", "xelatex", "lualatex"]
     assert client.post("/api/v1/compile", json={"mainFileName": "Main.tex", "engine": "tex", "files": [MAIN]}).status_code == 400
 
+    # Errors with a PDF: the PDF comes back with the errors in a header; a PNG preview still fails.
+    broken = {"name": "Main.tex", "content": "\\documentclass{article}\n\\begin{document}\n\\undefined\n"}
+    r = compile_([broken])
+    assert r.status_code == 200 and r.content == b"%PDF-1.5 fake"
+    errors = urllib.parse.unquote(r.headers["x-compile-errors"])
+    assert errors.startswith("./Main.tex:3: Undefined control sequence.\nl.3 \\undefined") and "couldn't open style file x.bst" in errors
+    assert "x-compile-errors" not in compile_([MAIN]).headers
+    r = client.post("/api/v1/compile?format=png", json={"mainFileName": "Main.tex", "files": [broken]})
+    assert r.status_code == 422 and "Undefined control sequence" in r.json()["error"]["log"]
+
 
 def test_engines_endpoint():
     from schemas.compiler import ENGINES
+
     from services import compiler as service
 
     assert client.get("/api/v1/compile/engines").json() == {"engines": ["pdflatex", "xelatex", "lualatex"], "default": "pdflatex"}
@@ -341,3 +368,29 @@ def test_figure_chats(fresh_state):
 def test_figure_chats_need_sign_in_and_the_table():
     assert client.get("/api/v1/figure-chats").status_code == 401
 
+
+
+def test_profile_tour_flag(fresh_state):
+    calls, replies = fresh_state
+    assert client.get("/api/v1/profile").status_code == 401
+    signed_in()
+    replies["/rest/v1/profiles?select"] = (200, [{"display_name": "ada", "show_tour": True}])
+    assert client.get("/api/v1/profile").json() == {"displayName": "ada", "showTour": True}
+
+    # Finishing the tour turns the flag off, on the caller's own row only.
+    assert client.patch("/api/v1/profile", json={"showTour": False}).status_code == 204
+    method, path, kwargs = calls[-1]
+    assert (method, path, kwargs["body"]) == ("PATCH", "/rest/v1/profiles?id=eq.u1", {"show_tour": False})
+    assert client.patch("/api/v1/profile", json={"showTour": "maybe"}).status_code == 400
+
+
+def test_profile_before_tour_column_exists(fresh_state):
+    # A database without profiles.show_tour: the tour still starts, and saving says what to run.
+    calls, replies = fresh_state
+    signed_in()
+    replies["/rest/v1/profiles?select=display_name,show_tour"] = (400, {"code": "42703", "message": "column profiles.show_tour does not exist"})
+    replies["/rest/v1/profiles?select=display_name&"] = (200, [{"display_name": "Ada"}])
+    assert client.get("/api/v1/profile").json() == {"displayName": "Ada", "showTour": True}
+    replies["/rest/v1/profiles?id"] = (400, {"code": "PGRST204", "message": "Could not find the 'show_tour' column"})
+    r = client.patch("/api/v1/profile", json={"showTour": False})
+    assert r.status_code == 503 and "schema.sql" in r.json()["error"]["message"]

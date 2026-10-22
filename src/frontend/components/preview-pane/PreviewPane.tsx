@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowRight, ChevronDown, Cpu, Download, RefreshCw, TriangleAlert } from "lucide-react";
 import Logo from "@/components/logo/Logo";
+import PdfViewer from "@/components/pdf-viewer/PdfViewer";
 import { apiJson } from "@/lib/api";
 import { firstTexError, type CompileOutput, type EngineOptions } from "@/lib/compile";
 import "./PreviewPane.css";
@@ -41,7 +42,9 @@ export default function PreviewPane({
       .catch(() => setEngineOptions(null));
   }, []);
 
-  const texError = output && !output.ok ? firstTexError(output.log) : null;
+  // A failed compile's log, or the errors LaTeX hit while still making the PDF.
+  const errorLog = output ? (output.ok ? output.errors : output.log) : "";
+  const texError = errorLog ? firstTexError(errorLog) : null;
   // Only offer the jump when the error is in one of the project's own files (not a system .tex file).
   const canJumpToError = Boolean(texError?.line) && (!texError?.file || fileNames.includes(texError.file));
   const compileChip = isCompiling
@@ -49,10 +52,20 @@ export default function PreviewPane({
     : output?.ok
       ? isStale
         ? { tone: "stale", label: "Out of date" }
-        : { tone: "ok", label: compileSeconds ? `Compiled in ${compileSeconds.toFixed(1)}s` : "Compiled" }
+        : output.errors
+          ? { tone: "error", label: "Compiled with errors" }
+          : { tone: "ok", label: compileSeconds ? `Compiled in ${compileSeconds.toFixed(1)}s` : "Compiled" }
       : output
         ? { tone: "error", label: "Compile failed" }
         : null;
+
+  const jumpToError = canJumpToError && texError && (
+    <button type="button" onClick={() => onGoToLine(texError.file, texError.line as number)}>
+      Go to line {texError.line}
+      {texError.file ? ` in ${texError.file}` : ""}
+      <ArrowRight size={15} aria-hidden="true" />
+    </button>
+  );
 
   const downloadPdf = () => {
     if (!output?.ok) {
@@ -125,13 +138,22 @@ export default function PreviewPane({
 
       <div className="diagram-canvas" aria-label="TikZ diagram preview">
         {output?.ok ? (
-          <div className={isStale ? "preview-frame stale" : "preview-frame"}>
-            <iframe
-              key={output.pdfObjectUrl}
-              className="compiled-preview-pdf"
-              src={output.pdfObjectUrl}
-              title="Compiled LaTeX PDF preview"
-            />
+          <div className={`preview-frame${isStale ? " stale" : ""}${output.errors ? " has-errors" : ""}`}>
+            {output.errors && (
+              <div className="compile-error-card" role="status">
+                <div className="compile-error-head">
+                  <TriangleAlert size={17} aria-hidden="true" />
+                  <code>{texError?.message ?? "LaTeX reported errors while making this PDF."}</code>
+                </div>
+                {jumpToError}
+                <details className="compile-log">
+                  <summary>All errors</summary>
+                  <pre>{output.errors}</pre>
+                </details>
+              </div>
+            )}
+            {/* Not keyed by URL: one viewer across recompiles, so zoom and scroll position stay put. */}
+            <PdfViewer className="compiled-preview-pdf" url={output.pdfObjectUrl} />
             {isCompiling && (
               <div className="preview-compiling-veil" role="status" aria-live="polite">
                 <Logo size={56} loop />
@@ -153,16 +175,7 @@ export default function PreviewPane({
             {texError && (
               <div className="compile-error-card">
                 <code>{texError.message}</code>
-                {canJumpToError && (
-                  <button
-                    type="button"
-                    onClick={() => onGoToLine(texError.file, texError.line as number)}
-                  >
-                    Go to line {texError.line}
-                    {texError.file ? ` in ${texError.file}` : ""}
-                    <ArrowRight size={15} aria-hidden="true" />
-                  </button>
-                )}
+                {jumpToError}
               </div>
             )}
             {output.log ? (

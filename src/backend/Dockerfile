@@ -1,24 +1,15 @@
-FROM python:3.12-slim-bookworm
+# Overleaf's default compiler: TeX Live 2026 with every package and font, so documents build and look the same.
+# Pinned by digest (the tag is rebuilt weekly); bump it deliberately, e.g. for TeX Live 2027.
+FROM texlive/texlive:latest@sha256:e8148b126545105c4aeeaa212f8a7bd02d05b500351372881055e1e59ae67d33
 
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PATH=/opt/venv/bin:$PATH
 
 RUN apt-get update \
-    && apt-get install --no-install-recommends -y \
-      latexmk \
-      biber \
-      texlive-bibtex-extra \
-      texlive-fonts-recommended \
-      texlive-latex-base \
-      texlive-latex-extra \
-      texlive-luatex \
-      texlive-pictures \
-      texlive-publishers \
-      texlive-xetex \
-      poppler-utils \
+    && apt-get install --no-install-recommends -y poppler-utils python3-venv \
     && rm -rf /var/lib/apt/lists/* \
     # lualatex's font index, built once here; otherwise every compile would rebuild it.
     && luaotfload-tool --update \
-    && useradd --system --uid 1000 --no-create-home app
+    && python3 -m venv /opt/venv
 
 WORKDIR /app
 
@@ -28,7 +19,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Code stays root-owned: the app user can run it but not modify it.
 COPY . .
 
-USER app
+# The image's own unprivileged user (uid 1000).
+USER texlive
 
 EXPOSE 4000
 

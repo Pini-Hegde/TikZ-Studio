@@ -1,0 +1,100 @@
+/* Pages on a grey desk with shadows (pdf.js's page border image), controls floating at the bottom, like Overleaf. */
+.pdf-viewer {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid rgb(var(--ink-rgb) / 0.16);
+  border-radius: 8px;
+  background: var(--raised);
+}
+
+/* pdf.js requires its scroll container to be absolutely positioned. */
+.pdf-viewer-scroll {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+}
+
+.pdf-viewer-failed {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  margin: 0;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.pdf-viewer-controls {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 8px 24px rgb(var(--shadow-rgb) / 0.18);
+  color: var(--ink);
+  font-size: 0.82rem;
+  font-weight: 700;
+  opacity: 0.55;
+  transition: opacity 0.2s;
+  translate: -50% 0;
+}
+
+.pdf-viewer:hover .pdf-viewer-controls,
+.pdf-viewer-controls:focus-within {
+  opacity: 1;
+}
+
+.pdf-viewer-controls button,
+.pdf-viewer-controls select,
+.pdf-viewer-page input {
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.pdf-viewer-controls button {
+  display: grid;
+  width: 28px;
+  place-items: center;
+  cursor: pointer;
+}
+
+.pdf-viewer-controls button:hover,
+.pdf-viewer-controls select:hover {
+  background: var(--panel-soft);
+}
+
+.pdf-viewer-controls select {
+  padding: 0 6px;
+  cursor: pointer;
+}
+
+.pdf-viewer-page {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 6px;
+  border-right: 1px solid var(--line);
+}
+
+.pdf-viewer-page input {
+  width: 3.2em;
+  padding: 0 4px;
+  background: var(--panel-soft);
+  text-align: center;
+  -moz-appearance: textfield;
+}
+
+.pdf-viewer-page input::-webkit-inner-spin-button {
+  display: none;
+}

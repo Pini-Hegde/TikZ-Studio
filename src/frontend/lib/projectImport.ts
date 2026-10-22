@@ -1,19 +1,47 @@
-// Upload: a .zip (whole project, e.g. an Overleaf download) or loose files -> project text files.
+// Upload: a .zip (whole project, e.g. an Overleaf download) or loose files -> project files.
 // Zip is read with the browser's own DecompressionStream; no library needed.
 
 // Mirrors backend defaults (backend/utils/config.py), which still enforce them on save.
 export const MAX_FILE_BYTES = 512 * 1024;
-export const MAX_FILE_COUNT = 25;
+export const MAX_FILE_COUNT = 100;
 export const MAX_PROJECT_BYTES = 2 * 1024 * 1024;
 const MAX_ZIP_ENTRIES = 2000;
 
+// Images \includegraphics can use. Stored as a base64 data URL in `content`; the backend writes the bytes.
+const IMAGE_TYPES: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  pdf: "application/pdf",
+  eps: "application/postscript",
+};
+
+// What the upload pickers offer: a project .zip, the usual source files and the images above.
+export const UPLOAD_ACCEPT = [".zip", ".tex", ".bib", ".sty", ".cls", ".bst", ".txt", ...Object.keys(IMAGE_TYPES).map((ext) => `.${ext}`)].join(",");
+
+// The backend matches the same pattern (services/compiler.py); a real text file never looks like this.
+const DATA_URL = /^data:[\w.+-]+\/[\w.+-]+;base64,([A-Za-z0-9+/]*={0,2})$/;
+
+export const isDataUrl = (content: string) => DATA_URL.test(content);
+
+/** The bytes of an uploaded image, or null for a text file. */
+export const dataUrlBytes = (content: string) => {
+  const base64 = DATA_URL.exec(content)?.[1];
+  return base64 === undefined ? null : Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+};
+
+const toDataUrl = (bytes: Uint8Array, type: string) => {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return `data:${type};base64,${btoa(binary)}`;
+};
+
 // Anything else is accepted if it decodes as UTF-8 text.
 const BINARY_EXTENSIONS = new Set([
-  "png", "jpg", "jpeg", "gif", "bmp", "tif", "tiff", "webp", "pdf", "eps", "ps", "svg", "zip", "gz",
+  "gif", "bmp", "tif", "tiff", "webp", "ps", "svg", "zip", "gz",
   "ttf", "otf", "woff", "woff2", "aux", "log", "synctex", "fls", "fdb_latexmk", "xdv", "dvi",
 ]);
 
-export type RawFile = { path: string; bytes: Uint8Array };
 export type ImportedFile = { name: string; content: string };
 export type ImportResult = { files: ImportedFile[]; skipped: { name: string; reason: string }[] };
 
@@ -131,6 +159,9 @@ export const toProjectFiles = (raw: { path: string; bytes: Uint8Array | null }[]
     entries = entries.map((entry) => ({ ...entry, path: entry.path.slice(entry.path.indexOf("/") + 1) }));
   }
 
+  // Images last: when the project fills up, a template's .tex/.sty/.bst still get in and only images are skipped.
+  entries.sort((a, b) => Number(extensionOf(a.path) in IMAGE_TYPES) - Number(extensionOf(b.path) in IMAGE_TYPES));
+
   const files: ImportedFile[] = [];
   let total = 0;
   for (const { path, bytes } of entries) {
@@ -143,12 +174,17 @@ export const toProjectFiles = (raw: { path: string; bytes: Uint8Array | null }[]
       continue;
     }
     const ext = extensionOf(path);
-    const text = BINARY_EXTENSIONS.has(ext) ? null : decodeText(bytes);
+    const text = IMAGE_TYPES[ext] ? toDataUrl(bytes, IMAGE_TYPES[ext]) : BINARY_EXTENSIONS.has(ext) ? null : decodeText(bytes);
     if (text === null) {
-      skipped.push({ name: path, reason: "images and other binary files aren't supported yet" });
+      skipped.push({ name: path, reason: "only .png, .jpg, .pdf and .eps images are supported" });
       continue;
     }
+    // Base64 is a third bigger than the image; the backend limits the stored size.
     const size = new TextEncoder().encode(text).length;
+    if (size > MAX_FILE_BYTES) {
+      skipped.push({ name: path, reason: `larger than ${MAX_FILE_BYTES / 1024} KB once stored` });
+      continue;
+    }
     if (files.length >= MAX_FILE_COUNT || total + size > MAX_PROJECT_BYTES) {
       skipped.push({ name: path, reason: `project limit (${MAX_FILE_COUNT} files, ${MAX_PROJECT_BYTES / 1024 / 1024} MB)` });
       continue;

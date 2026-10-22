@@ -11,7 +11,7 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, ConfigDict, StringConstraints
 
 from utils import config, supabase
-from utils.auth import ACCESS_COOKIE, REFRESH_COOKIE, current_user
+from utils.auth import ACCESS_COOKIE, REFRESH_COOKIE, current_user, public_user
 from utils.errors import AppError, error_response
 
 router = APIRouter(prefix="/api/v1/auth")
@@ -27,6 +27,10 @@ class Credentials(BaseModel):
     password: Annotated[str, StringConstraints(min_length=8, max_length=72)]
 
 
+class Signup(Credentials):
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=80)]
+
+
 def _cookie_options() -> dict:
     return {"httponly": True, "secure": config.COOKIE_SECURE, "samesite": "lax"}
 
@@ -35,8 +39,7 @@ def _start_session(response: Response, session: dict) -> dict:
     response.set_cookie(ACCESS_COOKIE, session["access_token"], max_age=int(session.get("expires_in", 3600)), path="/api", **_cookie_options())
     # Refresh token is only ever sent to the auth routes.
     response.set_cookie(REFRESH_COOKIE, session["refresh_token"], max_age=REFRESH_MAX_AGE, path="/api/v1/auth", **_cookie_options())
-    user = session.get("user") or {}
-    return {"id": user.get("id"), "email": user.get("email")}
+    return public_user(session.get("user") or {})
 
 
 def _end_session(response: Response) -> None:
@@ -45,7 +48,7 @@ def _end_session(response: Response) -> None:
 
 
 @router.post("/signup")
-def signup(body: Credentials, request: Request, response: Response):
+def signup(body: Signup, request: Request, response: Response):
     # PKCE: the confirmation link carries only a one-time code, useless without this browser's verifier cookie.
     verifier = secrets.token_urlsafe(64)
     challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
@@ -53,12 +56,23 @@ def signup(body: Credentials, request: Request, response: Response):
     status, data = supabase.call(
         "POST",
         f"/auth/v1/signup?redirect_to={callback}",
-        body={**body.model_dump(), "code_challenge": challenge, "code_challenge_method": "s256"},
+        body={
+            "email": body.email,
+            "password": body.password,
+            # Only a carrier: there's no session yet to write the profile with, so the profiles trigger copies it
+            # into profiles.display_name, which is what the app reads.
+            "data": {"display_name": body.name},
+            "code_challenge": challenge,
+            "code_challenge_method": "s256",
+        },
     )
     if status >= 400 or not isinstance(data, dict):
         raise AppError(400, "SIGNUP_FAILED", supabase.message(data, "Sign-up failed."))
     if data.get("access_token"):  # email confirmation disabled in Supabase
         return {"user": _start_session(response, data), "confirmEmail": False}
+    # With confirmation on, Supabase hides an already-registered email: no error, just a user with no identities.
+    if data.get("identities") == []:
+        raise AppError(409, "EMAIL_TAKEN", "An account with this email already exists. Log in instead.")
     response.set_cookie(PKCE_COOKIE, verifier, max_age=PKCE_MAX_AGE, path="/api/v1/auth", **_cookie_options())
     return {"user": None, "confirmEmail": True}
 

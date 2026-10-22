@@ -68,21 +68,25 @@ create policy "Users update their own profile" on public.profiles
   using (id = (select auth.uid()))
   with check (id = (select auth.uid()));
 
--- Users may read their profile and change only the display name. Rows are created by the trigger below.
+-- Whether the app tour still has to be shown: true for a new user, false once they finish or skip it.
+alter table public.profiles add column if not exists show_tour boolean not null default true;
+
+-- Users may read their profile and change only the display name and the tour flag. Rows are created by the trigger below.
 grant select on public.profiles to authenticated;
-grant update (display_name) on public.profiles to authenticated;
+grant update (display_name, show_tour) on public.profiles to authenticated;
 revoke all on public.profiles from anon;
 
 drop trigger if exists profiles_touch_updated_at on public.profiles;
 create trigger profiles_touch_updated_at before update on public.profiles
   for each row execute function public.touch_updated_at();
 
--- Create a profile automatically on sign-up (display name defaults to the part of the email before @).
+-- Create a profile automatically on sign-up, named with the name given at sign-up (the backend stores it as
+-- user_metadata.display_name), or the part of the email before @ for accounts made before names were asked for.
 create or replace function public.handle_new_user() returns trigger
 language plpgsql security definer set search_path = '' as $$
 begin
   insert into public.profiles (id, display_name)
-  values (new.id, left(split_part(new.email, '@', 1), 80))
+  values (new.id, left(coalesce(nullif(trim(new.raw_user_meta_data ->> 'display_name'), ''), split_part(new.email, '@', 1)), 80))
   on conflict (id) do nothing;
   return new;
 end;
@@ -95,10 +99,36 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created after insert on auth.users
   for each row execute function public.handle_new_user();
 
+-- Deleting a profile (e.g. in the Table Editor) deletes the whole account, so its email can sign up again. Without
+-- this the login in auth.users outlives the profile and sign-up keeps saying the email is taken. Deleting the auth
+-- user cascades to the profile, projects and figure chats; when that cascade fires this trigger, the user is already gone.
+create or replace function public.handle_profile_deleted() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  delete from auth.users where id = old.id;
+  return old;
+end;
+$$;
+
+-- Only the trigger may call it.
+revoke execute on function public.handle_profile_deleted() from public, anon, authenticated;
+
+drop trigger if exists on_profile_deleted on public.profiles;
+create trigger on_profile_deleted after delete on public.profiles
+  for each row execute function public.handle_profile_deleted();
+
 -- Give a profile to anyone who signed up before this table existed.
 insert into public.profiles (id, display_name)
-select id, left(split_part(email, '@', 1), 80) from auth.users
+select id, left(coalesce(nullif(trim(raw_user_meta_data ->> 'display_name'), ''), split_part(email, '@', 1)), 80) from auth.users
 on conflict (id) do nothing;
+
+-- Profiles made by the older trigger still carry the email default: give them the name from sign-up.
+update public.profiles p
+set display_name = left(trim(u.raw_user_meta_data ->> 'display_name'), 80)
+from auth.users u
+where u.id = p.id
+  and nullif(trim(u.raw_user_meta_data ->> 'display_name'), '') is not null
+  and p.display_name = left(split_part(u.email, '@', 1), 80);
 
 -- ─── Figure chats: Figure Studio conversations, one history per user across all projects. ───
 

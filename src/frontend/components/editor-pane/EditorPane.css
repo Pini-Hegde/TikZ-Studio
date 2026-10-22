@@ -251,3 +251,17 @@
 .editor-status::before {
   top: -1px;
 }
+
+.image-surface {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 14px;
+  padding: 24px;
+}
+
+.image-surface img {
+  max-width: 100%;
+  max-height: 60vh;
+  object-fit: contain;
+}

@@ -8,8 +8,8 @@ import { themeBootScript } from "@/components/theme-toggle/ThemeToggle";
 const serif = STIX_Two_Text({ subsets: ["latin"], style: ["normal", "italic"], variable: "--font-serif" });
 
 export const metadata: Metadata = {
-  title: "TikZ LaTeX Editor",
-  description: "A dark Next.js UI mockup for generating TikZ and LaTeX diagrams.",
+  title: "TikZ Studio",
+  description: "A LaTeX editor with AI-generated TikZ figures.",
 };
 
 export default function RootLayout({

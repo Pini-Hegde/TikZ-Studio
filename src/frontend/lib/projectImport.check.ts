@@ -1,7 +1,7 @@
 // Run: node app/projectImport.check.ts
 import assert from "node:assert/strict";
 import { deflateRawSync } from "node:zlib";
-import { ImportError, MAX_FILE_BYTES, readZip, toProjectFiles } from "./projectImport.ts";
+import { ImportError, MAX_FILE_BYTES, dataUrlBytes, readZip, toProjectFiles } from "./projectImport.ts";
 
 // Minimal zip writer for test input; method 8 = deflate, 0 = stored.
 const makeZip = (entries: { path: string; data: Uint8Array; method?: 0 | 8 }[]) => {
@@ -46,15 +46,19 @@ const zip = makeZip([
   { path: "thesis/main.tex", data: text("\uFEFF\\documentclass{article}\n\\input{chapters/intro}") },
   { path: "thesis/refs.bib", data: text("@book{x}"), method: 0 },
   { path: "thesis/figures/plot.png", data: png },
+  { path: "thesis/figures/anim.gif", data: png },
   { path: "thesis/.DS_Store", data: png },
   { path: "__MACOSX/thesis/._main.tex", data: png },
 ]);
 
 const { files, skipped } = toProjectFiles(await readZip(zip));
-assert.deepEqual(files.map((f) => f.name), ["main.tex", "refs.bib", "chapters/intro.tex"], "top folder stripped, main first");
+assert.deepEqual(files.map((f) => f.name), ["main.tex", "refs.bib", "chapters/intro.tex", "figures/plot.png"], "top folder stripped, main first");
 assert.equal(files[0].content, "\\documentclass{article}\n\\input{chapters/intro}", "BOM removed");
 assert.equal(files[2].content, "\\section{Intro}\n", "CRLF normalised");
-assert.deepEqual(skipped.map((s) => s.name), ["figures/plot.png"], "junk dropped silently, binary reported");
+assert.equal(files[3].content, "data:image/png;base64,iVBORwAAAAA=", "image stored as a data URL");
+assert.deepEqual(dataUrlBytes(files[3].content), png, "data URL round-trips");
+assert.equal(dataUrlBytes(files[0].content), null, "text is not an image");
+assert.deepEqual(skipped.map((s) => s.name), ["figures/anim.gif"], "junk dropped silently, unsupported binary reported");
 
 // Zip bomb: tiny compressed entry whose header lies about its size.
 const bomb = makeZip([{ path: "big.tex", data: new Uint8Array(MAX_FILE_BYTES * 4).fill(65) }]);

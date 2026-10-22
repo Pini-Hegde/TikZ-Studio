@@ -1,3 +1,4 @@
+import { dataUrlBytes } from "@/lib/projectImport";
 import { sanitizeFileName, type ProjectSummary } from "@/lib/projects";
 
 type ZipEntry = {
@@ -19,19 +20,6 @@ const crc32 = (data: Uint8Array) => {
   return (crc ^ 0xffffffff) >>> 0;
 };
 
-const concatBytes = (parts: Uint8Array[]) => {
-  const totalLength = parts.reduce((total, part) => total + part.length, 0);
-  const output = new Uint8Array(totalLength);
-  let offset = 0;
-
-  for (const part of parts) {
-    output.set(part, offset);
-    offset += part.length;
-  }
-
-  return output;
-};
-
 const createZipBlob = (entries: ZipEntry[]) => {
   const encoder = new TextEncoder();
   const now = new Date();
@@ -45,7 +33,7 @@ const createZipBlob = (entries: ZipEntry[]) => {
 
   for (const entry of entries) {
     const nameBytes = encoder.encode(entry.path);
-    const dataBytes = encoder.encode(entry.content);
+    const dataBytes = dataUrlBytes(entry.content) ?? encoder.encode(entry.content);
     const checksum = crc32(dataBytes);
     const localHeader = new Uint8Array(30 + nameBytes.length);
     const localView = new DataView(localHeader.buffer);
@@ -85,19 +73,17 @@ const createZipBlob = (entries: ZipEntry[]) => {
     offset += localHeader.length + dataBytes.length;
   }
 
-  const centralDirectory = concatBytes(centralParts);
+  const centralSize = centralParts.reduce((total, part) => total + part.length, 0);
   const endRecord = new Uint8Array(22);
   const endView = new DataView(endRecord.buffer);
 
   endView.setUint32(0, 0x06054b50, true);
   endView.setUint16(8, entries.length, true);
   endView.setUint16(10, entries.length, true);
-  endView.setUint32(12, centralDirectory.length, true);
+  endView.setUint32(12, centralSize, true);
   endView.setUint32(16, offset, true);
 
-  return new Blob([concatBytes([...localParts, centralDirectory, endRecord])], {
-    type: "application/zip",
-  });
+  return new Blob([...localParts, ...centralParts, endRecord] as BlobPart[], { type: "application/zip" });
 };
 
 export const downloadBlob = (blob: Blob, fileName: string) => {
